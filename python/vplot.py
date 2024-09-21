@@ -166,12 +166,14 @@ class Histogram:
     # pylint: disable=redefined-builtin
     def __init__(
         self,
-        arrays: list[typing.Iterable],
+        data: list[typing.Iterable],
         bins: int = 10,
         range: tuple[float, float] = None,
-        density: bool = False,
-        colors: list[str | Color] = None,
-        names: list[str] = None,
+        opacity: float = 1.0,
+        is_horizontal: bool = False,
+        is_probability_density: bool = False,
+        color: str | Color = None,
+        name: str = None,
         showlegend: bool = False,
         showannotation: bool = False,
     ):
@@ -186,26 +188,23 @@ class Histogram:
         Warning!
         See examples how underlying np.histogram behaves for `bins`.
         """
-        assert isinstance(arrays, list)
-        for arr in arrays:
-            assert isinstance(arr, typing.Iterable)
-        assert isinstance(colors, (list, type(None)))
-        if colors is not None:
-            for color in colors:
-                assert isinstance(color, Color)
-        assert isinstance(names, (list, type(None)))
-        if names is not None:
-            for name in names:
-                assert isinstance(name, str)
+        assert isinstance(data, typing.Iterable)
+        assert isinstance(color, (str, Color, type(None)))
+        assert isinstance(opacity, float)
+        assert isinstance(is_horizontal, bool)
+        assert isinstance(is_probability_density, bool)
+        assert isinstance(name, (str, type(None)))
         assert isinstance(showlegend, bool)
         assert isinstance(showannotation, bool)
 
-        self.arrays = arrays
+        self.data = data
         self.bins = bins
         self.range = range
-        self.density = density
-        self.colors = colors
-        self.names = names
+        self.opacity = opacity
+        self.is_horizontal = is_horizontal
+        self.is_probability_density = is_probability_density
+        self.color = color
+        self.name = name
         self.showlegend = showlegend
         self.showannotation = showannotation
 
@@ -908,7 +907,7 @@ class PlotlyPlot(Plot):
                     subplot_has_secondary_y = False
                     if self.subplots[subplot_i].traces is not None:
                         for t in self.subplots[subplot_i].traces:
-                            if t.secondary_y:
+                            if not isinstance(t, Histogram) and t.secondary_y:
                                 subplot_has_secondary_y = True
                     if subplot_has_secondary_y:
                         plotly_id += 2
@@ -942,7 +941,7 @@ class PlotlyPlot(Plot):
                     else:
                         type_str = "xy"
                         for t in s.traces:
-                            if t.secondary_y:
+                            if not isinstance(t, Histogram) and t.secondary_y:
                                 specs_entry["secondary_y"] = True
                     specs_entry["type"] = type_str
                     if isinstance(s.row, list):
@@ -1119,20 +1118,51 @@ class PlotlyPlot(Plot):
 
     @staticmethod
     def _add_histogram_to_fig(fig: go.Figure, subplot: Subplot, histogram: Histogram):
-        for i, arr in enumerate(histogram.arrays):
-            counts, bins = np.histogram(
-                a=arr,
-                bins=histogram.bins,
-                range=histogram.range,
-                density=histogram.density,
-            )
-            PlotlyPlot._add_bar_to_fig(
-                fig,
-                subplot,
-                Bar(
-                    x=bins, y=counts, color=histogram.colors[i], name=histogram.names[i]
-                ),
-            )
+        if histogram.is_probability_density:
+            histnorm = "probability density"
+        else:
+            histnorm = None
+        if histogram.range:
+            size = (histogram.range[1] - histogram.range[0]) / histogram.bins
+            bins = dict(start=histogram.range[0], end=histogram.range[1], size=size)
+            nbins = None
+        else:
+            bins = None
+        if histogram.is_horizontal:
+            x = None
+            nbinsx = None
+            xbins = None
+            y = histogram.data
+            nbinsy = nbins
+            ybins = bins
+        else:
+            x = histogram.data
+            nbinsx = nbins
+            xbins = bins
+            y = None
+            nbinsy = None
+            ybins = None
+
+        fig.add_trace(
+            go.Histogram(
+                x=x,
+                nbinsx=nbinsx,
+                xbins=xbins,
+                y=y,
+                nbinsy=nbinsy,
+                ybins=ybins,
+                histnorm=histnorm,
+                marker=dict(line=dict(width=0), color=Color.to_css(histogram.color)),
+                opacity=histogram.opacity,
+                name=histogram.name,
+                showlegend=histogram.showlegend,
+                legendgroup=subplot.legendgroup_name,
+                legendgrouptitle_text=subplot.legendgroup_name,
+            ),
+            col=subplot.col,
+            row=subplot.row,
+        )
+        fig.update_layout(barmode="overlay")
 
     @staticmethod
     def _add_scatter_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
