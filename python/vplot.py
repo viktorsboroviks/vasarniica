@@ -169,10 +169,11 @@ class Histogram:
         data: list[typing.Iterable],
         bins: int = 10,
         range: tuple[float, float] = None,
-        opacity: float = 1.0,
         is_horizontal: bool = False,
         is_probability_density: bool = False,
+        width: float = None,
         color: str | Color = None,
+        fill: typing.Literal[None, "solid", "transparent"] = None,
         name: str = None,
         showlegend: bool = False,
         showannotation: bool = False,
@@ -189,10 +190,13 @@ class Histogram:
         See examples how underlying np.histogram behaves for `bins`.
         """
         assert isinstance(data, typing.Iterable)
-        assert isinstance(color, (str, Color, type(None)))
-        assert isinstance(opacity, float)
         assert isinstance(is_horizontal, bool)
         assert isinstance(is_probability_density, bool)
+        assert isinstance(width, (float, type(None)))
+        assert isinstance(color, (str, Color, type(None)))
+        assert isinstance(fill, (str, type(None)))
+        if (isinstance(fill, str)):
+            assert fill in ("solid", "transparent")
         assert isinstance(name, (str, type(None)))
         assert isinstance(showlegend, bool)
         assert isinstance(showannotation, bool)
@@ -200,10 +204,11 @@ class Histogram:
         self.data = data
         self.bins = bins
         self.range = range
-        self.opacity = opacity
         self.is_horizontal = is_horizontal
         self.is_probability_density = is_probability_density
+        self.width = width
         self.color = color
+        self.fill = fill
         self.name = name
         self.showlegend = showlegend
         self.showannotation = showannotation
@@ -1118,51 +1123,51 @@ class PlotlyPlot(Plot):
 
     @staticmethod
     def _add_histogram_to_fig(fig: go.Figure, subplot: Subplot, histogram: Histogram):
-        if histogram.is_probability_density:
-            histnorm = "probability density"
-        else:
-            histnorm = None
-        if histogram.range:
-            size = (histogram.range[1] - histogram.range[0]) / histogram.bins
-            bins = dict(start=histogram.range[0], end=histogram.range[1], size=size)
-            nbins = None
-        else:
-            bins = None
+        count, index = np.histogram(a=histogram.data,
+                                    bins=histogram.bins,
+                                    range=histogram.range,
+                                    density=histogram.is_probability_density,
+        )
+
         if histogram.is_horizontal:
-            x = None
-            nbinsx = None
-            xbins = None
-            y = histogram.data
-            nbinsy = nbins
-            ybins = bins
+            x=count
+            y=index
         else:
-            x = histogram.data
-            nbinsx = nbins
-            xbins = bins
-            y = None
-            nbinsy = None
-            ybins = None
+            x=index
+            y=count
+
+        if histogram.fill:
+            if histogram.is_horizontal:
+                fill = "tozerox"
+            else:
+                fill = "tozeroy"
+            if histogram.fill == "solid":
+                fillcolor = Color.to_css(histogram.color)
+            elif histogram.fill == "transparent":
+                fillcolor = None
+        else:
+            fill = None
+            fillcolor = None
 
         fig.add_trace(
-            go.Histogram(
+            go.Scatter(
                 x=x,
-                nbinsx=nbinsx,
-                xbins=xbins,
                 y=y,
-                nbinsy=nbinsy,
-                ybins=ybins,
-                histnorm=histnorm,
-                marker=dict(line=dict(width=0), color=Color.to_css(histogram.color)),
-                opacity=histogram.opacity,
-                name=histogram.name,
+                line={"shape": "hv"},
+                line_color=Color.to_css(histogram.color),
+                line_width = PlotlyPlot._get_scatter_line_width(histogram.width),
+                fill=fill,
+                fillcolor = fillcolor,
                 showlegend=histogram.showlegend,
+                name=histogram.name,
+                # do not truncate long hover text
+                hoverlabel=dict(namelength=-1),
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
             col=subplot.col,
             row=subplot.row,
         )
-        fig.update_layout(barmode="overlay")
 
     @staticmethod
     def _add_scatter_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
