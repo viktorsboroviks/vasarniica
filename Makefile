@@ -9,11 +9,11 @@ all: format-python lint-python
 
 format: format-python
 
-format-python: python/vplot.py 
+format-python: python/*.py
 	black $^
 
 lint: lint-python
 
-lint-python: python/vplot.py 
+lint-python: python/*.py
 	pylint $^
 	flake8 $^

@@ -155,7 +155,6 @@ class Bar:
         self.showannotation = showannotation
 
 
-# TODO: consider adding HistogramDiscrete
 # pylint: disable=too-many-instance-attributes
 class Histogram:
     """
@@ -195,7 +194,7 @@ class Histogram:
         assert isinstance(width, (float, type(None)))
         assert isinstance(color, (str, Color, type(None)))
         assert isinstance(fill, (str, type(None)))
-        if (isinstance(fill, str)):
+        if isinstance(fill, str):
             assert fill in ("solid", "transparent")
         assert isinstance(name, (str, type(None)))
         assert isinstance(showlegend, bool)
@@ -413,6 +412,7 @@ class Subplot:
     _plotly_id: int
 
     # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-locals
     def __init__(
         self,
         traces: list[Trace | Bar | Histogram | None],
@@ -500,11 +500,14 @@ class Subplot:
         self.log_y = log_y
 
     def get_plotly_id_str(self):
+        """
+        Get plotly id.
+        """
+
         assert self._plotly_id > 0
         if self._plotly_id == 1:
             return ""
-        else:
-            return str(self._plotly_id)
+        return str(self._plotly_id)
 
 
 # pylint: disable=too-few-public-methods
@@ -689,9 +692,6 @@ class ImageSubplot(Subplot):
         self.image_path = image_path
 
 
-# TODO: Fix plot name placement
-# TODO: Investigate if possible to show/hide every subplot via
-#       interactive checkbox (resize remaining to fill the screen)
 class Plot:
     """
     Plot containing one or several Subplots.
@@ -783,17 +783,13 @@ class Plot:
         cols = 1
         for s in self.subplots:
             if isinstance(s.row, int):
-                if s.row > rows:
-                    rows = s.row
+                rows = max(s.row, rows)
             else:
-                if s.row[1] > rows:
-                    rows = s.row[1]
+                rows = max(s.row[1], rows)
             if isinstance(s.col, int):
-                if s.col > cols:
-                    cols = s.col
+                cols = max(s.col, cols)
             else:
-                if s.col[1] > cols:
-                    cols = s.col[1]
+                cols = max(s.col[1], cols)
         self.rows = rows
         self.cols = cols
 
@@ -877,10 +873,14 @@ class PlotlyPlot(Plot):
 
     # pylint: disable=too-many-branches
     # generate plotly specs for make_subplots()
-    # ref: https://plotly.com/python-api-reference/generated/plotly.subplots.make_subplots.html
+    # pylint: disable=line-too-long
+    # ref: https://plotly.com/python-api-reference/generated/plotly.subplots.make_subplots.html  # noqa
+    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-statements
     def _init_specs(self):
 
-        # create an array with accurate col/row dimensions, filled with index of occupying subplot
+        # create an array with accurate col/row dimensions,
+        # filled with index of occupying subplot
         # if the slot is empty, set to -1
         specs_arr = np.empty((self.rows, self.cols), dtype=int)
         specs_arr[:] = -1
@@ -902,11 +902,13 @@ class PlotlyPlot(Plot):
 
         # go over the array row-by-row
         # assign every subplot an id based on their global position
+        # pylint: disable=too-many-nested-blocks
         processed_subplot_i = set()
         plotly_id = 1
         for row in specs_arr:
             for subplot_i in row:
                 if subplot_i not in processed_subplot_i:
+                    # pylint: disable=protected-access
                     self.subplots[subplot_i]._plotly_id = plotly_id
                     processed_subplot_i.add(subplot_i)
                     subplot_has_secondary_y = False
@@ -923,6 +925,7 @@ class PlotlyPlot(Plot):
         # if entry is empty -> add {}
         # if entry is not empty -> fill, based on type and span
         # if entry is already used -> add None
+        # pylint: disable=too-many-nested-blocks
         used_i = set()
         specs = []
         # rows and cols in np are indexed from 0
@@ -977,42 +980,42 @@ class PlotlyPlot(Plot):
         assert isinstance(line_width, (float, int))
 
         if marker_symbol == MarkerSymbol.TRIANGLE_UP:
-            marker = dict(
-                size=marker_size,
-                standoff=10 + marker_yshift,
-                symbol="triangle-up",
-                angle=0,
-                color=color,
-            )
+            marker = {
+                "size": marker_size,
+                "standoff": 10 + marker_yshift,
+                "symbol": "triangle-up",
+                "angle": 0,
+                "color": color,
+            }
         elif marker_symbol == MarkerSymbol.TRIANGLE_DOWN:
             # standoff can only be >0, so to move the triangle down
             # above with standoff=10, it is rotated 180deg and
             # 'triangle-up' is used
-            marker = dict(
-                size=marker_size,
-                standoff=10 - marker_yshift,
-                symbol="triangle-up",
-                angle=180,
-                color=color,
-            )
+            marker = {
+                "size": marker_size,
+                "standoff": 10 - marker_yshift,
+                "symbol": "triangle-up",
+                "angle": 180,
+                "color": color,
+            }
         elif marker_symbol == MarkerSymbol.CIRCLE:
-            marker = dict(
-                size=marker_size,
-                symbol="circle",
-                angle=0,
-                color=color,
-            )
+            marker = {
+                "size": marker_size,
+                "symbol": "circle",
+                "angle": 0,
+                "color": color,
+            }
         elif marker_symbol == MarkerSymbol.EMPTY_CIRCLE:
-            marker = dict(
-                size=marker_size,
-                symbol="circle",
-                angle=0,
-                color="white",
-                line=dict(
-                    color=color,
-                    width=line_width,
-                ),
-            )
+            marker = {
+                "size": marker_size,
+                "symbol": "circle",
+                "angle": 0,
+                "color": "white",
+                "line": {
+                    "color": color,
+                    "width": line_width,
+                },
+            }
         elif marker_symbol is None:
             marker = None
         else:
@@ -1096,7 +1099,7 @@ class PlotlyPlot(Plot):
                 showlegend=bar.showlegend,
                 name=bar.name,
                 # do not truncate long hover text
-                hoverlabel=dict(namelength=-1),
+                hoverlabel={"namelength": -1},
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
@@ -1123,18 +1126,19 @@ class PlotlyPlot(Plot):
 
     @staticmethod
     def _add_histogram_to_fig(fig: go.Figure, subplot: Subplot, histogram: Histogram):
-        count, index = np.histogram(a=histogram.data,
-                                    bins=histogram.bins,
-                                    range=histogram.range,
-                                    density=histogram.is_probability_density,
+        count, index = np.histogram(
+            a=histogram.data,
+            bins=histogram.bins,
+            range=histogram.range,
+            density=histogram.is_probability_density,
         )
 
         if histogram.is_horizontal:
-            x=count
-            y=index
+            x = count
+            y = index
         else:
-            x=index
-            y=count
+            x = index
+            y = count
 
         if histogram.fill:
             if histogram.is_horizontal:
@@ -1155,13 +1159,13 @@ class PlotlyPlot(Plot):
                 y=y,
                 line={"shape": "hv"},
                 line_color=Color.to_css(histogram.color),
-                line_width = PlotlyPlot._get_scatter_line_width(histogram.width),
+                line_width=PlotlyPlot._get_scatter_line_width(histogram.width),
                 fill=fill,
-                fillcolor = fillcolor,
+                fillcolor=fillcolor,
                 showlegend=histogram.showlegend,
                 name=histogram.name,
                 # do not truncate long hover text
-                hoverlabel=dict(namelength=-1),
+                hoverlabel={"namelength": -1},
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
@@ -1195,7 +1199,7 @@ class PlotlyPlot(Plot):
                 showlegend=trace.showlegend,
                 name=trace.name,
                 # do not truncate long hover text
-                hoverlabel=dict(namelength=-1),
+                hoverlabel={"namelength": -1},
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
@@ -1247,7 +1251,7 @@ class PlotlyPlot(Plot):
                 showlegend=trace.showlegend,
                 name=trace.name,
                 # do not truncate long hover text
-                hoverlabel=dict(namelength=-1),
+                hoverlabel={"namelength": -1},
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
@@ -1287,7 +1291,7 @@ class PlotlyPlot(Plot):
                 showlegend=trace.showlegend,
                 name=trace.name,
                 # do not truncate long hover text
-                hoverlabel=dict(namelength=-1),
+                hoverlabel={"namelength": -1},
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
@@ -1296,7 +1300,7 @@ class PlotlyPlot(Plot):
         )
         fig.update_traces(
             line_width=PlotlyPlot._get_candlestick_line_width(trace.width),
-            selector=dict(type="candlestick"),
+            selector={"type": "candlestick"},
         )
 
     def _add_subplot_to_fig(self, fig: go.Figure, subplot: Subplot):
@@ -1326,8 +1330,6 @@ class PlotlyPlot(Plot):
                     raise ValueError(f"{type(t)} is an unsupported trace class.")
         if subplot.x_min is not None and subplot.x_max is not None:
             fig.update_xaxes(range=[subplot.x_min, subplot.x_max])
-            # TODO: add automatic calculation of x_min, x_max
-            #       if None for certain types of traces
         if subplot.log_y:
             fig.update_yaxes(type="log", col=col, row=row)
         if subplot.x_title:
@@ -1374,7 +1376,7 @@ class PlotlyPlot(Plot):
 
         if subplot.colors:
             colors = [Color.to_css(color) for color in subplot.colors]
-            marker = dict(colors=colors)
+            marker = {"colors": colors}
         else:
             marker = None
 
@@ -1388,7 +1390,7 @@ class PlotlyPlot(Plot):
                 textposition="outside",
                 insidetextorientation="horizontal",
                 # do not truncate long hover text
-                hoverlabel=dict(namelength=-1),
+                hoverlabel={"namelength": -1},
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
@@ -1418,6 +1420,7 @@ class PlotlyPlot(Plot):
         fig.update_yaxes(visible=False, row=subplot.row, col=subplot.col)
 
         extension = pathlib.Path(subplot.image_path).suffix
+        # pylint: disable=consider-using-with
         image_base64 = base64.b64encode(open(subplot.image_path, "rb").read())
         if extension == ".svg":
             source = f"data:image/svg+xml;base64,{image_base64.decode()}"
@@ -1460,7 +1463,7 @@ class PlotlyPlot(Plot):
             # there is a bug that requires you to force `opacity` and
             # `line_width` to some value if a `simple_white` theme is used:
             # pylint: disable=line-too-long
-            # ref: https://stackoverflow.com/questions/67327670/plotly-add-hline-doesnt-work-with-simple-white-template
+            # ref: https://stackoverflow.com/questions/67327670/plotly-add-hline-doesnt-work-with-simple-white-template  # noqa
             for x in line.x:
                 fig.add_vline(
                     x=x,
@@ -1503,15 +1506,15 @@ class PlotlyPlot(Plot):
         for s in self.subplots:
             if s.subtitle_text:
                 annotations += [
-                    dict(
-                        text=s.subtitle_text,
-                        xref=f"x{s.get_plotly_id_str()} domain",
-                        yref=f"y{s.get_plotly_id_str()} domain",
-                        x=s.subtitle_x,
-                        y=s.subtitle_y,
-                        xanchor="left",
-                        showarrow=False,
-                    ),
+                    {
+                        "text": s.subtitle_text,
+                        "xref": f"x{s.get_plotly_id_str()} domain",
+                        "yref": f"y{s.get_plotly_id_str()} domain",
+                        "x": s.subtitle_x,
+                        "y": s.subtitle_y,
+                        "xanchor": "left",
+                        "showarrow": False,
+                    },
                 ]
         fig.update_layout(annotations=annotations)
 
@@ -1527,14 +1530,14 @@ class PlotlyPlot(Plot):
         )
         # set title
         if self.title_text:
-            fig.update_layout(title=dict(text=self.title_text))
+            fig.update_layout(title={"text": self.title_text})
         # set dimensions
         fig.update_layout(width=self.width, height=self.height)
         # best theme in plotly
         fig.update_layout(template="simple_white")
         # set font size
         if self.font_size:
-            fig.update_layout(font=dict(size=self.font_size))
+            fig.update_layout(font={"size": self.font_size})
         # set grid
         fig.update_yaxes(showgrid=self.grid)
         fig.update_xaxes(showgrid=self.grid)
@@ -1631,7 +1634,6 @@ class MplPlot(Plot):
             font_size: int
             grid: add grid to the plot
         """
-        # TODO: Add parameter for arranging subplots (specs)
         Plot.__init__(
             self,
             subplots,
@@ -1767,7 +1769,6 @@ class MplPlot(Plot):
             linewidth=trace.width,
             label=trace.name,
         )
-        # TODO: add support for subplot.legendroup_name
         if trace.showlegend:
             ax.legend()
 
@@ -1906,7 +1907,6 @@ class MplPlot(Plot):
             label=trace.name,
         )
 
-        # TODO: add support for subplot.legendroup_name
         if trace.showlegend:
             ax.legend()
 
@@ -1955,6 +1955,5 @@ class MplPlot(Plot):
             width=0.6,
         )
 
-        # TODO: add support for subplot.legendroup_name
         if trace.showlegend:
             ax.legend()
