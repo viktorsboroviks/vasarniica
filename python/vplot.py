@@ -428,6 +428,7 @@ class Subplot:
         subtitle_y: float = 0,
         legendgroup_name: str = None,
         log_y: bool = False,
+        stack_y: bool = False,
     ):
         """
         Init.
@@ -446,6 +447,7 @@ class Subplot:
             legendgroup_name: if not None - subtitle for all traces under
                               this subplot;
             log_y: use logarithmic scale
+            stack_y: stack y trace data on top of each other
 
         Change `col`, `row` only if there is more than one
         subplot in a plot.
@@ -481,6 +483,7 @@ class Subplot:
         assert isinstance(subtitle_y, (int, float))
         assert isinstance(legendgroup_name, (str, type(None)))
         assert isinstance(log_y, bool)
+        assert isinstance(stack_y, bool)
         assert (x_min is None and x_max is None) or (
             x_min is not None and x_max is not None
         )
@@ -498,6 +501,7 @@ class Subplot:
         self.subtitle_y = subtitle_y
         self.legendgroup_name = legendgroup_name
         self.log_y = log_y
+        self.stack_y = stack_y
 
     def get_plotly_id_str(self):
         """
@@ -914,7 +918,7 @@ class PlotlyPlot(Plot):
                     subplot_has_secondary_y = False
                     if self.subplots[subplot_i].traces is not None:
                         for t in self.subplots[subplot_i].traces:
-                            if not isinstance(t, Histogram) and t.secondary_y:
+                            if not isinstance(t, (Histogram, Bar)) and t.secondary_y:
                                 subplot_has_secondary_y = True
                     if subplot_has_secondary_y:
                         plotly_id += 2
@@ -949,7 +953,7 @@ class PlotlyPlot(Plot):
                     else:
                         type_str = "xy"
                         for t in s.traces:
-                            if not isinstance(t, Histogram) and t.secondary_y:
+                            if not isinstance(t, (Histogram, Bar)) and t.secondary_y:
                                 specs_entry["secondary_y"] = True
                     specs_entry["type"] = type_str
                     if isinstance(s.row, list):
@@ -1181,10 +1185,13 @@ class PlotlyPlot(Plot):
 
         color = Color.to_css(trace.color)
         line_width = PlotlyPlot._get_scatter_line_width(trace.width)
+        stackgroup = "one" if subplot.stack_y else None
+
         fig.add_trace(
             go.Scatter(
                 x=trace.x,
                 y=trace.y,
+                stackgroup=stackgroup,
                 mode=trace.mode,
                 line_color=color,
                 line_width=line_width,
