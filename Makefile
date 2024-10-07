@@ -7,13 +7,19 @@
 
 all: format-python lint-python
 
-format: format-python
+venv: requirements.txt
+	python3 -m venv venv
+	./venv/bin/pip3 install --no-cache-dir --requirement requirements.txt
+
+format: venv format-python
 
 format-python: python/*.py
-	black $^
+	source ./venv/bin/activate ;\
+		black $^
 
-lint: lint-python
+lint: venv lint-python
 
 lint-python: python/*.py
-	pylint $^
-	flake8 $^
+	source ./venv/bin/activate ;\
+		pylint $^ ;\
+		flake8 $^
