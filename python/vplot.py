@@ -320,6 +320,7 @@ class Scatter(Trace):
         self,
         x: pd.Index,
         y: pd.Series,
+        text: pd.Series = None,
         secondary_y: bool = False,
         color: str | Color = None,
         width: int | float = None,
@@ -331,6 +332,8 @@ class Scatter(Trace):
         marker_symbol: MarkerSymbol = None,
         marker_size: int = None,
         marker_yshift: float = 0,
+        fill: typing.Literal["tonexty", "tozeroy", None] = None,
+        hoverinfo: str = None,
     ):
         """
         Init.
@@ -355,16 +358,22 @@ class Scatter(Trace):
             showannotation=showannotation,
         )
 
+        assert isinstance(text, (pd.Series, type(None)))
         assert mode in ("lines", "lines+markers", "markers")
         assert isinstance(marker_symbol, (MarkerSymbol, type(None)))
         assert not (mode in ("markers", "lines+markers") and marker_symbol is None)
         assert isinstance(marker_size, (float, int, type(None)))
         assert isinstance(marker_yshift, (float, int))
+        assert fill in ("tonexty", "tozeroy", None)
+        assert isinstance(hoverinfo, (str, type(None)))
 
+        self.text = text
         self.mode = mode
         self.marker_symbol = marker_symbol
         self.marker_size = marker_size
         self.marker_yshift = marker_yshift
+        self.fill = fill
+        self.hoverinfo = hoverinfo
 
 
 class Step(Trace):
@@ -378,6 +387,7 @@ class Step(Trace):
         self,
         x: pd.Index,
         y: pd.Series,
+        text: pd.Series = None,
         secondary_y: bool = False,
         color: str | Color = None,
         width: int | float = None,
@@ -385,6 +395,8 @@ class Step(Trace):
         name: str = None,
         showlegend: bool = False,
         showannotation: bool = False,
+        fill: typing.Literal["tonexty", "tozeroy", None] = None,
+        hoverinfo: str = None,
     ):
         """
         Init.
@@ -404,6 +416,14 @@ class Step(Trace):
             showlegend=showlegend,
             showannotation=showannotation,
         )
+
+        assert isinstance(text, (pd.Series, type(None)))
+        assert fill in ("tonexty", "tozeroy", None)
+        assert isinstance(hoverinfo, (str, type(None)))
+
+        self.text = text
+        self.fill = fill
+        self.hoverinfo = hoverinfo
 
 
 # pylint: disable=too-few-public-methods
@@ -996,7 +1016,7 @@ class PlotlyPlot(Plot):
         if marker_symbol == MarkerSymbol.TRIANGLE_UP:
             marker = {
                 "size": marker_size,
-                "standoff": 10 + marker_yshift,
+                "standoff": marker_yshift,
                 "symbol": "triangle-up",
                 "angle": 0,
                 "color": color,
@@ -1007,7 +1027,7 @@ class PlotlyPlot(Plot):
             # 'triangle-up' is used
             marker = {
                 "size": marker_size,
-                "standoff": 10 - marker_yshift,
+                "standoff": -marker_yshift,
                 "symbol": "triangle-up",
                 "angle": 180,
                 "color": color,
@@ -1203,6 +1223,7 @@ class PlotlyPlot(Plot):
             go.Scatter(
                 x=trace.x,
                 y=trace.y,
+                text=trace.text,
                 stackgroup=stackgroup,
                 mode=trace.mode,
                 line_color=color,
@@ -1215,6 +1236,8 @@ class PlotlyPlot(Plot):
                     color=color,
                     line_width=line_width,
                 ),
+                fill=trace.fill,
+                hoverinfo=trace.hoverinfo,
                 showlegend=trace.showlegend,
                 name=trace.name,
                 # do not truncate long hover text
@@ -1248,13 +1271,13 @@ class PlotlyPlot(Plot):
     def _add_step_to_fig(
         fig: go.Figure,
         subplot: Subplot,
-        trace: Trace,
+        trace: Step,
         yshift: int | float = 0,
         annotation_yshift: int | float = 0,
     ):
         assert isinstance(fig, go.Figure)
         assert isinstance(subplot, Subplot)
-        assert isinstance(trace, Trace)
+        assert isinstance(trace, Step)
         assert isinstance(yshift, (int, float))
         assert isinstance(annotation_yshift, (int, float))
 
@@ -1262,15 +1285,18 @@ class PlotlyPlot(Plot):
             go.Scatter(
                 x=trace.x,
                 y=trace.y + yshift,
+                text=trace.text,
                 mode="lines",
                 line={"shape": "hv"},
                 line_color=Color.to_css(trace.color),
                 line_width=PlotlyPlot._get_scatter_line_width(trace.width),
                 line_dash=PlotlyPlot._get_line_dash(trace.dash),
+                fill=trace.fill,
                 showlegend=trace.showlegend,
                 name=trace.name,
                 # do not truncate long hover text
                 hoverlabel={"namelength": -1},
+                hoverinfo=trace.hoverinfo,
                 legendgroup=subplot.legendgroup_name,
                 legendgrouptitle_text=subplot.legendgroup_name,
             ),
