@@ -19,9 +19,29 @@ format-python: python/*.py
 	. ./venv/bin/activate && \
 		black $^
 
-lint: venv lint-python
+lint: lint-python lint-cpp
 
-lint-python: python/*.py
+lint-cpp: \
+		include/vasarniica/vtime.hpp
+	cppcheck \
+		--enable=warning,portability,performance \
+		--enable=style,information \
+		--enable=missingInclude \
+		--inconclusive \
+		--library=std,posix,gnu \
+		--platform=unix64 \
+		--language=c++ \
+		--std=c++20 \
+		--inline-suppr \
+		--check-level=exhaustive \
+		--suppress=missingIncludeSystem \
+		--suppress=checkersReport \
+		--checkers-report=cppcheck_report.txt \
+		-I./include \
+		$^
+
+lint-python: venv \
+		python/*.py
 	. ./venv/bin/activate && \
 		pylint $^ ; \
 		flake8 $^
