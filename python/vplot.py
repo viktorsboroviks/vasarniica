@@ -83,9 +83,9 @@ class Dash(enum.Enum):
 
 
 # pylint: disable=too-few-public-methods
-class Lines:
+class Line:
     """
-    Lines.
+    Line.
     """
 
     # pylint: disable=too-many-arguments
@@ -97,6 +97,7 @@ class Lines:
         color: str | Color = None,
         width: float = 1.0,
         dash: Dash = Dash.DOT,
+        name: str = None,
     ):
         """
         Init.
@@ -109,12 +110,14 @@ class Lines:
         assert isinstance(color, (str, Color, type(None)))
         assert isinstance(width, float)
         assert isinstance(dash, Dash)
+        assert isinstance(name, (str, type(None)))
 
         self.x = x
         self.y = y
         self.color = color
         self.width = width
         self.dash = dash
+        self.name = name
 
 
 class Bar:
@@ -161,8 +164,7 @@ class Histogram:
     """
 
     # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-positional-arguments
-    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-positional-argument
     def __init__(
         self,
         data: list[typing.Iterable],
@@ -441,7 +443,7 @@ class Subplot:
     def __init__(
         self,
         traces: list[Trace | Bar | Histogram | None],
-        lines: list[Lines] = None,
+        lines: list[Line] = None,
         x_min=None,
         x_max=None,
         col: int | list[int] = 1,
@@ -460,7 +462,7 @@ class Subplot:
 
         Args:
             traces: a list of Traces to be plotted;
-            lines: a list of horizontal/vertical Lines to be plotted;
+            lines: a list of horizontal/vertical Line to be plotted;
             x_min, x_max: can be used to prevent Plotly x axis changing width
             col: column number of this subplot or a range [int, int];
             row: row number of this subplot or a range [int, int];
@@ -486,7 +488,7 @@ class Subplot:
         if lines is not None:
             assert len(lines) > 0
             for ln in lines:
-                assert isinstance(ln, Lines)
+                assert isinstance(ln, Line)
         assert isinstance(col, (int, list))
         if isinstance(col, int):
             assert col >= 1
@@ -528,15 +530,20 @@ class Subplot:
         self.log_y = log_y
         self.stack_y = stack_y
 
+    @staticmethod
+    def get_plotly_i_str(axis_str, val):
+        assert axis_str in ("x", "y")
+        assert isinstance(val, int)
+        assert val > 0
+        if val == 1:
+            return axis_str
+        return f"{axis_str}{val}"
+
     def get_plotly_id_str(self):
         """
         Get plotly id.
         """
-
-        assert self._plotly_id > 0
-        if self._plotly_id == 1:
-            return ""
-        return str(self._plotly_id)
+        return get_plotly_i_str(self._plotly_id)
 
 
 # pylint: disable=too-few-public-methods
@@ -550,7 +557,7 @@ class LogicSignalSubplot(Subplot):
     def __init__(
         self,
         steps: list[Step],
-        lines: list[Lines] = None,
+        lines: list[Line] = None,
         col: int | list[int] = 1,
         row: int | list[int] = 1,
         x_title: str = None,
@@ -566,7 +573,7 @@ class LogicSignalSubplot(Subplot):
 
         Args:
             steps: a list of Steps to be plotted;
-            lines: a list of horizontal/vertical Lines to be plotted;
+            lines: a list of horizontal/vertical Line to be plotted;
             col: column number of this subplot or a range [int, int];
             row: row number of this subplot or a range [int, int];
             x_title: str
@@ -735,9 +742,10 @@ class Plot:
     def __init__(
         self,
         subplots: list[Subplot],
-        share_x: bool | str = True,
-        share_y: bool | str = False,
-        lines: list[Lines] = None,
+        share_x: bool | typing.Literal["all", "columns", "rows"] = True,
+        share_y: bool | typing.Literal["all", "columns", "rows"] = False,
+        share_x_cols: list[bool] = None,
+        lines: list[Line] = None,
         title_text: str = None,
         height: int = None,
         width: int = None,
@@ -751,9 +759,10 @@ class Plot:
 
         Args:
             subplots: a list of subplots to be plotted;
-            share_x: share x axis between subplots
-            share_y: share y axis between subplots
-            lines: a list of horizontal/vertical Lines to be plotted;
+            share_x: share x axis between subplots;
+            share_y: share y axis between subplots;
+            share_x_cols: a list of booleans to define cols to share x axis;
+            lines: a list of horizontal/vertical Line to be plotted;
             title_text: str
             height: plot height in pixels;
             width: plot width in pixels;
@@ -774,12 +783,20 @@ class Plot:
                     s is not s2 and s.col == s2.col and s.row == s2.row
                 ), "Both rows and columns of different suplots should not overlap"
         assert isinstance(share_x, (bool, str))
+        if isinstance(share_x, str):
+            assert share_x in ("all", "columns", "rows")
         assert isinstance(share_y, (bool, str))
+        if isinstance(share_y, str):
+            assert share_y in ("all", "columns", "rows")
+        assert isinstance(share_x_cols, (list, type(None)))
+        if share_x_cols:
+            for c in share_x_cols:
+                assert isinstance(c, bool)
         assert isinstance(lines, (list, type(None)))
         if lines:
             assert len(lines) > 0
             for line in lines:
-                assert isinstance(line, Lines)
+                assert isinstance(line, Line)
         assert isinstance(title_text, (str, type(None)))
         assert isinstance(height, (int, type(None)))
         if height:
@@ -801,6 +818,7 @@ class Plot:
         self.subplots = subplots
         self.share_x = share_x
         self.share_y = share_y
+        self.share_x_cols = share_x_cols
         self.lines = lines
         self.title_text = title_text
         self.height = height
@@ -859,9 +877,10 @@ class PlotlyPlot(Plot):
     def __init__(
         self,
         subplots: list[Subplot],
-        share_x: bool = True,
-        share_y: bool = False,
-        lines: list[Lines] = None,
+        share_x: bool | typing.Literal["all", "columns", "rows"] = True,
+        share_y: bool | typing.Literal["all", "columns", "rows"] = False,
+        share_x_cols: list[bool] = None,
+        lines: list[Line] = None,
         title_text: str = None,
         height: int = None,
         width: int = None,
@@ -875,9 +894,10 @@ class PlotlyPlot(Plot):
 
         Args:
             subplots: a list of subplots to be plotted;
-            share_x: share x axis between subplots
-            share_y: share y axis between subplots
-            lines: a list of horizontal/vertical Lines to be plotted;
+            share_x: share x axis between subplots;
+            share_y: share y axis between subplots;
+            share_x_cols: a list of booleans to define cols to share x axis;
+            lines: a list of horizontal/vertical Line to be plotted;
             title_text: str
             height: plot height in pixels;
             width: plot width in pixels;
@@ -890,17 +910,18 @@ class PlotlyPlot(Plot):
         """
         Plot.__init__(
             self,
-            subplots,
-            share_x,
-            share_y,
-            lines,
-            title_text,
-            height,
-            width,
-            row_ratios,
-            col_ratios,
-            font_size,
-            grid,
+            subplots=subplots,
+            share_x=share_x,
+            share_y=share_y,
+            share_x_cols=share_x_cols,
+            lines=lines,
+            title_text=title_text,
+            height=height,
+            width=width,
+            row_ratios=row_ratios,
+            col_ratios=col_ratios,
+            font_size=font_size,
+            grid=grid,
         )
 
         self._init_specs()
@@ -1166,7 +1187,6 @@ class PlotlyPlot(Plot):
             range=histogram.range,
             density=histogram.is_probability_density,
         )
-
         if histogram.is_horizontal:
             x = count
             y = index
@@ -1191,9 +1211,10 @@ class PlotlyPlot(Plot):
 
         fig.add_trace(
             go.Scatter(
+                mode="lines",
                 x=x,
                 y=y,
-                line={"shape": "hv"},
+                line={"shape": "hvh"},
                 line_color=Color.to_css(histogram.color),
                 line_width=PlotlyPlot._get_scatter_line_width(histogram.width),
                 fill=fill,
@@ -1489,12 +1510,12 @@ class PlotlyPlot(Plot):
     @staticmethod
     def _add_line_to_fig(
         fig: go.Figure,
-        line: Lines,
+        line: Line,
         col: int | typing.Iterable | typing.Literal["all"] = "all",
         row: int | typing.Iterable | typing.Literal["all"] = "all",
     ):
         assert isinstance(fig, go.Figure)
-        assert isinstance(line, Lines)
+        assert isinstance(line, Line)
         assert isinstance(col, (int, str))
         if isinstance(col, str):
             assert col == "all"
@@ -1563,6 +1584,14 @@ class PlotlyPlot(Plot):
                 ]
         fig.update_layout(annotations=annotations)
 
+    def _share_x_cols(self, fig):
+        if self.share_x_cols:
+            for i in range(0, len(self.share_x_cols)):
+                if self.share_x_cols[i]:
+                    axis_str = Subplot.get_plotly_i_str("x", i + 1)
+                    for row in range(1, self.rows + 1):
+                        fig.update_xaxes(matches=axis_str, row=row, col=i + 1)
+
     def _get_fig(self) -> go.Figure:
         fig = plotly.subplots.make_subplots(
             rows=self.rows,
@@ -1573,6 +1602,10 @@ class PlotlyPlot(Plot):
             row_heights=self.row_ratios,
             column_widths=self.col_ratios,
         )
+
+        # share x between columns
+        self._share_x_cols(fig)
+
         # set title
         if self.title_text:
             fig.update_layout(title={"text": self.title_text})
