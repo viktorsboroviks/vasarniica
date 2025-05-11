@@ -27,7 +27,7 @@ g_logger = None
 def configure(
     log_level: typing.Literal[
         "debug", "info", "warning", "error", "critical"
-    ] = LOG_LEVEL_DEFAULT
+    ] = LOG_LEVEL_DEFAULT,
 ):
     """
     Configure logging.
@@ -50,7 +50,7 @@ def configure(
 
 
 def is_effective(
-    log_level: typing.Literal["debug", "info", "warning", "error", "critical"]
+    log_level: typing.Literal["debug", "info", "warning", "error", "critical"],
 ) -> bool:
     """
     Return True if provided log_level is effective.

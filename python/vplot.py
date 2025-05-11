@@ -215,6 +215,38 @@ class Histogram:
         self.showannotation = showannotation
 
 
+# pylint: disable=too-many-instance-attributes
+class CDF:
+    """
+    Cumulative Distribution Function.
+    """
+
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-argument
+    def __init__(
+        self,
+        data: list[typing.Iterable],
+        width: float = None,
+        color: str | Color = None,
+        name: str = None,
+        showlegend: bool = False,
+        showannotation: bool = False,
+    ):
+        assert isinstance(data, typing.Iterable)
+        assert isinstance(width, (float, type(None)))
+        assert isinstance(color, (str, Color, type(None)))
+        assert isinstance(name, (str, type(None)))
+        assert isinstance(showlegend, bool)
+        assert isinstance(showannotation, bool)
+
+        self.data = data
+        self.width = width
+        self.color = color
+        self.name = name
+        self.showlegend = showlegend
+        self.showannotation = showannotation
+
+
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-instance-attributes
 class Trace:
@@ -483,7 +515,7 @@ class Subplot:
         if traces is not None:
             assert len(traces) > 0
             for t in traces:
-                assert isinstance(t, (Trace, Bar, Histogram))
+                assert isinstance(t, (Trace, Bar, Histogram, CDF))
         assert isinstance(lines, (list, type(None)))
         if lines is not None:
             assert len(lines) > 0
@@ -969,7 +1001,10 @@ class PlotlyPlot(Plot):
                     subplot_has_secondary_y = False
                     if self.subplots[subplot_i].traces is not None:
                         for t in self.subplots[subplot_i].traces:
-                            if not isinstance(t, (Histogram, Bar)) and t.secondary_y:
+                            if (
+                                not isinstance(t, (Histogram, CDF, Bar))
+                                and t.secondary_y
+                            ):
                                 subplot_has_secondary_y = True
                     if subplot_has_secondary_y:
                         plotly_id += 2
@@ -1004,7 +1039,10 @@ class PlotlyPlot(Plot):
                     else:
                         type_str = "xy"
                         for t in s.traces:
-                            if not isinstance(t, (Histogram, Bar)) and t.secondary_y:
+                            if (
+                                not isinstance(t, (Histogram, CDF, Bar))
+                                and t.secondary_y
+                            ):
                                 specs_entry["secondary_y"] = True
                     specs_entry["type"] = type_str
                     if isinstance(s.row, list):
@@ -1231,6 +1269,31 @@ class PlotlyPlot(Plot):
         )
 
     @staticmethod
+    def _add_cdf_to_fig(fig: go.Figure, subplot: Subplot, cdf: CDF):
+        sorted_x, cdf_counts = np.unique(cdf.data, return_counts=True)
+        assert len(cdf.data) == np.sum(cdf_counts)
+        y = np.cumsum(cdf_counts) / np.sum(cdf_counts)
+
+        fig.add_trace(
+            go.Scatter(
+                mode="lines",
+                x=sorted_x,
+                y=y,
+                #                line={"shape": "hvh"},
+                line_color=Color.to_css(cdf.color),
+                line_width=PlotlyPlot._get_scatter_line_width(cdf.width),
+                showlegend=cdf.showlegend,
+                name=cdf.name,
+                # do not truncate long hover text
+                hoverlabel={"namelength": -1},
+                legendgroup=subplot.legendgroup_name,
+                legendgrouptitle_text=subplot.legendgroup_name,
+            ),
+            col=subplot.col,
+            row=subplot.row,
+        )
+
+    @staticmethod
     def _add_scatter_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
         assert isinstance(fig, go.Figure)
         assert isinstance(subplot, Subplot)
@@ -1386,6 +1449,8 @@ class PlotlyPlot(Plot):
                     PlotlyPlot._add_bar_to_fig(fig, subplot, t)
                 elif isinstance(t, Histogram):
                     PlotlyPlot._add_histogram_to_fig(fig, subplot, t)
+                elif isinstance(t, CDF):
+                    PlotlyPlot._add_cdf_to_fig(fig, subplot, t)
                 elif isinstance(t, Scatter):
                     PlotlyPlot._add_scatter_to_fig(fig, subplot, t)
                 elif isinstance(t, Step):
