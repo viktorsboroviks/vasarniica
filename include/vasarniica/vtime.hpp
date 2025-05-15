@@ -5,7 +5,18 @@
 #include <iomanip>
 
 // https://github.com/HowardHinnant/date.git v3.0.1
+// for some reasone gcc finds warning inside date/date.h
+// fixing is not worth the effort
+// potentially related to using c++20
+#if defined(__GNUC__) && !defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+    #pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
 #include "date/date.h"
+#if defined(__GNUC__) && !defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
 
 
 namespace vtime {
@@ -16,19 +27,10 @@ namespace vtime {
         const std::string& str,
         const std::string fmt = "%F")
     {
-// for some reasone gcc finds warning inside date/date.h
-// fixing is not worth the effort
-#if defined __GNUC__ && !defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#endif
         T tp;
         std::stringstream ss{str};
         ss >> date::parse(fmt, tp);
         return tp;
-#if defined __GNUC__ && !defined(__clang__)
-    #pragma GCC diagnostic pop
-#endif
     }
 
     // Convert std::chrono::time_point to string
