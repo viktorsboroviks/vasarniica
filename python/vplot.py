@@ -363,6 +363,7 @@ class Scatter(Trace):
         showlegend: bool = False,
         showannotation: bool = False,
         mode: typing.Literal["lines", "lines+markers", "markers"] = "lines",
+        marker: dict = None,
         marker_symbol: MarkerSymbol = None,
         marker_size: int = None,
         marker_yshift: float = 0,
@@ -394,8 +395,8 @@ class Scatter(Trace):
 
         assert isinstance(text, (pd.Series, type(None)))
         assert mode in ("lines", "lines+markers", "markers")
+        assert isinstance(marker, (dict, type(None)))
         assert isinstance(marker_symbol, (MarkerSymbol, type(None)))
-        assert not (mode in ("markers", "lines+markers") and marker_symbol is None)
         assert isinstance(marker_size, (float, int, type(None)))
         assert isinstance(marker_yshift, (float, int))
         assert fill in ("tonexty", "tozeroy", None)
@@ -403,11 +404,64 @@ class Scatter(Trace):
 
         self.text = text
         self.mode = mode
+        self.marker = marker
         self.marker_symbol = marker_symbol
         self.marker_size = marker_size
         self.marker_yshift = marker_yshift
         self.fill = fill
         self.hoverinfo = hoverinfo
+
+
+# pylint: disable=too-few-public-methods
+class ScatterHeatmap2D(Scatter):
+    """
+    Scatter Heatmap 2D.
+    """
+
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
+    def __init__(
+        self,
+        x: pd.Index,
+        y: pd.Series,
+        f: pd.Series,
+        text: pd.Series = None,
+        colorscale: str = "Viridis",
+        marker_size: int = None,
+        color: str | Color = None,
+        width: int | float = None,
+        dash: Dash = Dash.SOLID,
+        name: str = None,
+        showlegend: bool = False,
+        showannotation: bool = False,
+        hoverinfo: str = None,
+    ):
+        """
+        Init.
+
+        Args:
+            color: string with the CSS color name or a color code;
+        """
+        Scatter.__init__(
+            self,
+            x=x,
+            y=y,
+            text=text,
+            secondary_y=False,
+            color=color,
+            width=width,
+            dash=dash,
+            name=name,
+            showlegend=showlegend,
+            showannotation=showannotation,
+            mode="markers",
+            marker={"color": f, "colorscale": colorscale, "size": marker_size},
+            marker_symbol=None,
+            marker_size=None,
+            marker_yshift=0,
+            fill=None,
+            hoverinfo=hoverinfo,
+        )
 
 
 class Step(Trace):
@@ -1303,6 +1357,17 @@ class PlotlyPlot(Plot):
         line_width = PlotlyPlot._get_scatter_line_width(trace.width)
         stackgroup = "one" if subplot.stack_y else None
 
+        if trace.marker:
+            marker = trace.marker
+        else:
+            marker = PlotlyPlot._get_marker(
+                trace.marker_symbol,
+                trace.marker_size,
+                trace.marker_yshift,
+                color=color,
+                line_width=line_width,
+            )
+
         fig.add_trace(
             go.Scatter(
                 x=trace.x,
@@ -1313,13 +1378,7 @@ class PlotlyPlot(Plot):
                 line_color=color,
                 line_width=line_width,
                 line_dash=PlotlyPlot._get_line_dash(trace.dash),
-                marker=PlotlyPlot._get_marker(
-                    trace.marker_symbol,
-                    trace.marker_size,
-                    trace.marker_yshift,
-                    color=color,
-                    line_width=line_width,
-                ),
+                marker=marker,
                 fill=trace.fill,
                 hoverinfo=trace.hoverinfo,
                 showlegend=trace.showlegend,
