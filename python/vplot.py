@@ -169,7 +169,7 @@ class Histogram:
         self,
         data: list[typing.Iterable],
         bins: int = 10,
-        range: tuple[float, float] = None,
+        data_range: tuple[float, float] = None,
         is_horizontal: bool = False,
         is_probability_density: bool = False,
         width: float = None,
@@ -202,11 +202,19 @@ class Histogram:
         assert isinstance(showlegend, bool)
         assert isinstance(showannotation, bool)
 
-        self.data = data
-        self.bins = bins
-        self.range = range
-        self.is_horizontal = is_horizontal
-        self.is_probability_density = is_probability_density
+        count, index = np.histogram(
+            a=data,
+            bins=bins,
+            range=data_range,
+            density=is_probability_density,
+        )
+        if is_horizontal:
+            self.x = count
+            self.y = index
+        else:
+            self.x = index
+            self.y = count
+
         self.width = width
         self.color = color
         self.fill = fill
@@ -514,6 +522,56 @@ class Step(Trace):
         self.hoverinfo = hoverinfo
 
 
+class Surface:
+    """
+    Surface trace.
+    """
+
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
+    def __init__(
+        self,
+        x: typing.Iterable,
+        y: typing.Iterable,
+        z: typing.Iterable,
+        colorscale: str = "Viridis",
+        showscale: bool = False,
+        name: str = None,
+    ):
+        """
+        Init.
+
+        Args:
+            color: string with the CSS color name or a color code.
+        """
+        assert isinstance(x, typing.Iterable)
+        assert isinstance(y, typing.Iterable)
+        assert isinstance(z, typing.Iterable)
+        assert isinstance(name, (str, type(None)))
+        assert isinstance(colorscale, str)
+        assert colorscale in (
+            "Viridis",
+            "Cividis",
+            "Plasma",
+            "Magma",
+            "Inferno",
+            "Blues",
+            "Greens",
+            "Reds",
+            "Greys",
+            "YlOrRd",
+            "YlGnBu",
+        )
+        assert isinstance(showscale, bool)
+
+        self.x = x
+        self.y = y
+        self.z = z
+        self.colorscale = colorscale
+        self.showscale = showscale
+        self.name = name
+
+
 # pylint: disable=too-few-public-methods
 class Subplot:
     """
@@ -569,7 +627,10 @@ class Subplot:
         if traces is not None:
             assert len(traces) > 0
             for t in traces:
-                assert isinstance(t, (Trace, Bar, Histogram, CDF))
+                assert isinstance(t, (Trace, Bar, Histogram, CDF, Surface))
+                if isinstance(t, Surface):
+                    for ta in traces:
+                        assert isinstance(ta, Surface)
         assert isinstance(lines, (list, type(None)))
         if lines is not None:
             assert len(lines) > 0
@@ -629,7 +690,7 @@ class Subplot:
         """
         Get plotly id.
         """
-        return get_plotly_i_str(self._plotly_id)
+        return self.get_plotly_i_str(self._plotly_id)
 
 
 # pylint: disable=too-few-public-methods
@@ -1056,7 +1117,7 @@ class PlotlyPlot(Plot):
                     if self.subplots[subplot_i].traces is not None:
                         for t in self.subplots[subplot_i].traces:
                             if (
-                                not isinstance(t, (Histogram, CDF, Bar))
+                                not isinstance(t, (Histogram, CDF, Bar, Surface))
                                 and t.secondary_y
                             ):
                                 subplot_has_secondary_y = True
@@ -1090,11 +1151,13 @@ class PlotlyPlot(Plot):
                             assert not t.secondary_y
                     elif isinstance(s, ImageSubplot):
                         type_str = "image"
+                    elif all(isinstance(t, Surface) for t in s.traces):
+                        type_str = "scene"
                     else:
                         type_str = "xy"
                         for t in s.traces:
                             if (
-                                not isinstance(t, (Histogram, CDF, Bar))
+                                not isinstance(t, (Histogram, CDF, Bar, Surface))
                                 and t.secondary_y
                             ):
                                 specs_entry["secondary_y"] = True
@@ -1224,6 +1287,19 @@ class PlotlyPlot(Plot):
         return ret
 
     @staticmethod
+    def _get_subplot_data_range(subplot):
+        x_vals = []
+        y_vals = []
+        for t in subplot.traces:
+            if hasattr(t, "x") and t.x is not None:
+                x_vals.extend(t.x)
+            if hasattr(t, "y") and t.y is not None:
+                y_vals.extend(t.y)
+        x_min, x_max = min(x_vals), max(x_vals)
+        y_min, y_max = min(y_vals), max(y_vals)
+        return [x_min, x_max], [y_min, y_max]
+
+    @staticmethod
     def _get_annotation_text(legendgroup_name: str | type(None), name: str) -> str:
         assert isinstance(legendgroup_name, (str, type(None)))
         assert isinstance(name, str)
@@ -1273,19 +1349,6 @@ class PlotlyPlot(Plot):
 
     @staticmethod
     def _add_histogram_to_fig(fig: go.Figure, subplot: Subplot, histogram: Histogram):
-        count, index = np.histogram(
-            a=histogram.data,
-            bins=histogram.bins,
-            range=histogram.range,
-            density=histogram.is_probability_density,
-        )
-        if histogram.is_horizontal:
-            x = count
-            y = index
-        else:
-            x = index
-            y = count
-
         if histogram.fill:
             if histogram.is_horizontal:
                 fill = "tozerox"
@@ -1304,8 +1367,8 @@ class PlotlyPlot(Plot):
         fig.add_trace(
             go.Scatter(
                 mode="lines",
-                x=x,
-                y=y,
+                x=histogram.x,
+                y=histogram.y,
                 line={"shape": "hvh"},
                 line_color=Color.to_css(histogram.color),
                 line_width=PlotlyPlot._get_scatter_line_width(histogram.width),
@@ -1491,6 +1554,25 @@ class PlotlyPlot(Plot):
             selector={"type": "candlestick"},
         )
 
+    @staticmethod
+    def _add_surface_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
+        assert isinstance(fig, go.Figure)
+        assert isinstance(subplot, Subplot)
+        assert isinstance(trace, Surface)
+
+        fig.add_trace(
+            go.Surface(
+                x=trace.x,
+                y=trace.y,
+                z=trace.z,
+                name=trace.name,
+                colorscale=trace.colorscale,
+                showscale=trace.showscale,
+            ),
+            col=subplot.col,
+            row=subplot.row,
+        )
+
     def _add_subplot_to_fig(self, fig: go.Figure, subplot: Subplot):
         assert isinstance(fig, go.Figure)
         assert isinstance(subplot, Subplot)
@@ -1516,6 +1598,8 @@ class PlotlyPlot(Plot):
                     PlotlyPlot._add_step_to_fig(fig, subplot, t)
                 elif isinstance(t, Candlestick):
                     PlotlyPlot._add_candlestick_to_fig(fig, subplot, t)
+                elif isinstance(t, Surface):
+                    PlotlyPlot._add_surface_to_fig(fig, subplot, t)
                 else:
                     raise ValueError(f"{type(t)} is an unsupported trace class.")
         if subplot.x_min is not None and subplot.x_max is not None:
@@ -1632,22 +1716,16 @@ class PlotlyPlot(Plot):
         )
 
     @staticmethod
-    def _add_line_to_fig(
+    def _add_line_to_subplot(
         fig: go.Figure,
+        subplot: Subplot,
         line: Line,
-        col: int | typing.Iterable | typing.Literal["all"] = "all",
-        row: int | typing.Iterable | typing.Literal["all"] = "all",
     ):
         assert isinstance(fig, go.Figure)
+        assert isinstance(subplot, Subplot)
         assert isinstance(line, Line)
-        assert isinstance(col, (int, str))
-        if isinstance(col, str):
-            assert col == "all"
-        assert isinstance(row, (int, str, typing.Iterable))
-        if isinstance(row, typing.Iterable):
-            row = row[0]
-        if isinstance(row, str):
-            assert row == "all"
+
+        x_range, y_range = PlotlyPlot._get_subplot_data_range(subplot)
 
         if line.x is not None:
             # there is a bug that requires you to force `opacity` and
@@ -1655,39 +1733,49 @@ class PlotlyPlot(Plot):
             # pylint: disable=line-too-long
             # ref: https://stackoverflow.com/questions/67327670/plotly-add-hline-doesnt-work-with-simple-white-template  # noqa
             for x in line.x:
-                fig.add_vline(
-                    x=x,
-                    opacity=1,
-                    line_width=PlotlyPlot._get_hv_line_width(line.width),
-                    line_dash=PlotlyPlot._get_line_dash(line.dash),
-                    line_color=Color.to_css(line.color),
-                    col=col,
-                    row=row,
+                fig.add_trace(
+                    go.Scatter(
+                        x=[x, x],
+                        y=y_range,
+                        mode="lines",
+                        line=dict(
+                            color=Color.to_css(line.color),
+                            width=PlotlyPlot._get_hv_line_width(line.width),
+                            dash=PlotlyPlot._get_line_dash(line.dash),
+                        ),
+                        showlegend=False,
+                        hoverinfo="skip",
+                    ),
+                    col=subplot.col,
+                    row=subplot.row,
                 )
         if line.y is not None:
             for y in line.y:
-                fig.add_hline(
-                    y=y,
-                    opacity=1,
-                    line_width=PlotlyPlot._get_hv_line_width(line.width),
-                    line_dash=PlotlyPlot._get_line_dash(line.dash),
-                    line_color=Color.to_css(line.color),
-                    col=col,
-                    row=row,
+                fig.add_trace(
+                    go.Scatter(
+                        x=x_range,
+                        y=[y, y],
+                        mode="lines",
+                        line=dict(
+                            color=Color.to_css(line.color),
+                            width=PlotlyPlot._get_hv_line_width(line.width),
+                            dash=PlotlyPlot._get_line_dash(line.dash),
+                        ),
+                        showlegend=False,
+                        hoverinfo="skip",
+                    ),
+                    col=subplot.col,
+                    row=subplot.row,
                 )
 
     def _add_lines_to_fig(self, fig: go.Figure):
         assert isinstance(fig, go.Figure)
 
-        # add plot lines
-        if self.lines:
-            for line in self.lines:
-                PlotlyPlot._add_line_to_fig(fig, line)
         # add subplot lines
         for s in self.subplots:
             if s.lines:
                 for line in s.lines:
-                    PlotlyPlot._add_line_to_fig(fig, line, col=s.col, row=s.row)
+                    PlotlyPlot._add_line_to_subplot(fig, s, line)
 
     def _add_subtitles_to_fig(self, fig: go.Figure):
         assert isinstance(fig, go.Figure)
