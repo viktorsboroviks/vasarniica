@@ -421,9 +421,9 @@ class Scatter(Trace):
 
 
 # pylint: disable=too-few-public-methods
-class ScatterHeatmap2D(Scatter):
+class ScatterHeatmap2d(Scatter):
     """
-    Scatter Heatmap 2D.
+    Scatter Heatmap 2d.
     """
 
     # pylint: disable=too-many-arguments
@@ -524,7 +524,7 @@ class Step(Trace):
 
 class Scatter3d:
     """
-    Scatter3d trace.
+    Scatter 3D trace.
     """
 
     # pylint: disable=too-many-arguments
