@@ -522,9 +522,9 @@ class Step(Trace):
         self.hoverinfo = hoverinfo
 
 
-class Surface:
+class Scatter3d:
     """
-    Surface trace.
+    Scatter3d trace.
     """
 
     # pylint: disable=too-many-arguments
@@ -534,9 +534,9 @@ class Surface:
         x: typing.Iterable,
         y: typing.Iterable,
         z: typing.Iterable,
-        colorscale: str = "Viridis",
-        showscale: bool = False,
         name: str = None,
+        marker_size: int = 1,
+        colorscale: str = "Viridis",
     ):
         """
         Init.
@@ -547,7 +547,9 @@ class Surface:
         assert isinstance(x, typing.Iterable)
         assert isinstance(y, typing.Iterable)
         assert isinstance(z, typing.Iterable)
+        assert len(x) == len(y) == len(z)
         assert isinstance(name, (str, type(None)))
+        assert isinstance(marker_size, (int, float))
         assert isinstance(colorscale, str)
         assert colorscale in (
             "Viridis",
@@ -562,14 +564,13 @@ class Surface:
             "YlOrRd",
             "YlGnBu",
         )
-        assert isinstance(showscale, bool)
 
         self.x = x
         self.y = y
         self.z = z
-        self.colorscale = colorscale
-        self.showscale = showscale
         self.name = name
+        self.marker_size = marker_size
+        self.colorscale = colorscale
 
 
 # pylint: disable=too-few-public-methods
@@ -579,7 +580,8 @@ class Subplot:
     """
 
     # special identifier used in several plotly calls
-    _plotly_id: int
+    _plotly_i: int
+    _plotly_type: str
 
     # pylint: disable=too-many-arguments
     # pylint: disable=too-many-positional-arguments
@@ -594,6 +596,7 @@ class Subplot:
         row: int | list[int] = 1,
         x_title: str = None,
         y_title: str = None,
+        z_title: str = None,
         subtitle_text: str = None,
         subtitle_x: float = 0,
         subtitle_y: float = 0,
@@ -627,10 +630,10 @@ class Subplot:
         if traces is not None:
             assert len(traces) > 0
             for t in traces:
-                assert isinstance(t, (Trace, Bar, Histogram, CDF, Surface))
-                if isinstance(t, Surface):
+                assert isinstance(t, (Trace, Bar, Histogram, CDF, Scatter3d))
+                if isinstance(t, Scatter3d):
                     for ta in traces:
-                        assert isinstance(ta, Surface)
+                        assert isinstance(ta, Scatter3d)
         assert isinstance(lines, (list, type(None)))
         if lines is not None:
             assert len(lines) > 0
@@ -670,27 +673,27 @@ class Subplot:
         self.row = row
         self.x_title = x_title
         self.y_title = y_title
+        self.z_title = z_title
         self.subtitle_text = subtitle_text
         self.subtitle_x = subtitle_x
         self.subtitle_y = subtitle_y
         self.legendgroup_name = legendgroup_name
         self.log_y = log_y
         self.stack_y = stack_y
+        self._plotly_type = ""
+        self._plotly_i = -1
 
     @staticmethod
-    def get_plotly_i_str(axis_str, val):
-        assert axis_str in ("x", "y")
+    def get_plotly_id_str(axis_str, val):
+        assert axis_str in ("x", "y", "xy", "scene")
         assert isinstance(val, int)
         assert val > 0
         if val == 1:
             return axis_str
         return f"{axis_str}{val}"
 
-    def get_plotly_id_str(self):
-        """
-        Get plotly id.
-        """
-        return self.get_plotly_i_str(self._plotly_id)
+    def plotly_id(self):
+        return Subplot.get_plotly_id_str(self._plotly_type, self._plotly_i)
 
 
 # pylint: disable=too-few-public-methods
@@ -1106,25 +1109,33 @@ class PlotlyPlot(Plot):
         # assign every subplot an id based on their global position
         # pylint: disable=too-many-nested-blocks
         processed_subplot_i = set()
-        plotly_id = 1
+        xy_plotly_i = 1
+        scene_plotly_i = 1
         for row in specs_arr:
             for subplot_i in row:
                 if subplot_i not in processed_subplot_i:
                     # pylint: disable=protected-access
-                    self.subplots[subplot_i]._plotly_id = plotly_id
-                    processed_subplot_i.add(subplot_i)
-                    subplot_has_secondary_y = False
-                    if self.subplots[subplot_i].traces is not None:
-                        for t in self.subplots[subplot_i].traces:
-                            if (
-                                not isinstance(t, (Histogram, CDF, Bar, Surface))
-                                and t.secondary_y
-                            ):
-                                subplot_has_secondary_y = True
-                    if subplot_has_secondary_y:
-                        plotly_id += 2
+                    s = self.subplots[subplot_i]
+                    if all(isinstance(t, Scatter3d) for t in s.traces):
+                        s._plotly_type = "scene"
+                        s._plotly_i = scene_plotly_i
+                        scene_plotly_i += 1
                     else:
-                        plotly_id += 1
+                        s._plotly_type = "xy"
+                        s._plotly_i = xy_plotly_i
+                        subplot_has_secondary_y = False
+                        if self.subplots[subplot_i].traces is not None:
+                            for t in self.subplots[subplot_i].traces:
+                                if (
+                                    not isinstance(t, (Histogram, CDF, Bar, Scatter3d))
+                                    and t.secondary_y
+                                ):
+                                    subplot_has_secondary_y = True
+                        if subplot_has_secondary_y:
+                            xy_plotly_i += 2
+                        else:
+                            xy_plotly_i += 1
+                    processed_subplot_i.add(subplot_i)
 
         # go over the array row-by-row
         # if entry is empty -> add {}
@@ -1151,13 +1162,13 @@ class PlotlyPlot(Plot):
                             assert not t.secondary_y
                     elif isinstance(s, ImageSubplot):
                         type_str = "image"
-                    elif all(isinstance(t, Surface) for t in s.traces):
+                    elif all(isinstance(t, Scatter3d) for t in s.traces):
                         type_str = "scene"
                     else:
                         type_str = "xy"
                         for t in s.traces:
                             if (
-                                not isinstance(t, (Histogram, CDF, Bar, Surface))
+                                not isinstance(t, (Histogram, CDF, Bar, Scatter3d))
                                 and t.secondary_y
                             ):
                                 specs_entry["secondary_y"] = True
@@ -1555,19 +1566,24 @@ class PlotlyPlot(Plot):
         )
 
     @staticmethod
-    def _add_surface_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
+    def _add_scatter3d_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
         assert isinstance(fig, go.Figure)
         assert isinstance(subplot, Subplot)
-        assert isinstance(trace, Surface)
+        assert isinstance(trace, Scatter3d)
 
         fig.add_trace(
-            go.Surface(
+            go.Scatter3d(
                 x=trace.x,
                 y=trace.y,
                 z=trace.z,
                 name=trace.name,
-                colorscale=trace.colorscale,
-                showscale=trace.showscale,
+                mode="markers",
+                marker=dict(
+                    size=trace.marker_size,
+                    color=trace.z,
+                    colorscale=trace.colorscale,
+                ),
+                showlegend=False,
             ),
             col=subplot.col,
             row=subplot.row,
@@ -1598,18 +1614,35 @@ class PlotlyPlot(Plot):
                     PlotlyPlot._add_step_to_fig(fig, subplot, t)
                 elif isinstance(t, Candlestick):
                     PlotlyPlot._add_candlestick_to_fig(fig, subplot, t)
-                elif isinstance(t, Surface):
-                    PlotlyPlot._add_surface_to_fig(fig, subplot, t)
+                elif isinstance(t, Scatter3d):
+                    PlotlyPlot._add_scatter3d_to_fig(fig, subplot, t)
                 else:
                     raise ValueError(f"{type(t)} is an unsupported trace class.")
-        if subplot.x_min is not None and subplot.x_max is not None:
-            fig.update_xaxes(range=[subplot.x_min, subplot.x_max])
-        if subplot.log_y:
-            fig.update_yaxes(type="log", col=col, row=row)
-        if subplot.x_title:
-            fig.update_xaxes(title_text=subplot.x_title, col=col, row=row)
-        if subplot.y_title:
-            fig.update_yaxes(title_text=subplot.y_title, col=col, row=row)
+
+        if subplot.traces is not None and all(
+            isinstance(t, Scatter3d) for t in subplot.traces
+        ):
+            # 3d scene
+            scene_name = subplot.plotly_id()
+            fig.update_layout(
+                **{
+                    scene_name: dict(
+                        xaxis=dict(title=subplot.x_title),
+                        yaxis=dict(title=subplot.y_title),
+                        zaxis=dict(title=subplot.z_title),
+                    )
+                }
+            )
+        else:
+            # other
+            if subplot.x_min is not None and subplot.x_max is not None:
+                fig.update_xaxes(range=[subplot.x_min, subplot.x_max])
+            if subplot.log_y:
+                fig.update_yaxes(type="log", col=col, row=row)
+            if subplot.x_title:
+                fig.update_xaxes(title_text=subplot.x_title, col=col, row=row)
+            if subplot.y_title:
+                fig.update_yaxes(title_text=subplot.y_title, col=col, row=row)
 
     def _add_logic_signal_subplot_to_fig(
         self, fig: go.Figure, subplot: LogicSignalSubplot
@@ -1673,6 +1706,9 @@ class PlotlyPlot(Plot):
         )
 
     def _add_image_subplot_to_fig(self, fig: go.Figure, subplot: PieSubplot):
+        # must be texted and fixed, issue in plotly_id enumeration
+        assert False
+
         assert isinstance(fig, go.Figure)
         assert isinstance(subplot, ImageSubplot)
 
@@ -1705,8 +1741,8 @@ class PlotlyPlot(Plot):
 
         fig.add_layout_image(
             source=source,
-            xref=f"x{subplot.get_plotly_id_str()} domain",
-            yref=f"y{subplot.get_plotly_id_str()} domain",
+            xref=f"x{subplot.plotly_id()} domain",
+            yref=f"y{subplot.plotly_id()} domain",
             xanchor="center",
             yanchor="middle",
             x=0.5,
@@ -1786,8 +1822,8 @@ class PlotlyPlot(Plot):
                 annotations += [
                     {
                         "text": s.subtitle_text,
-                        "xref": f"x{s.get_plotly_id_str()} domain",
-                        "yref": f"y{s.get_plotly_id_str()} domain",
+                        "xref": f"x{s._plotly_i} domain",
+                        "yref": f"y{s._plotly_i} domain",
                         "x": s.subtitle_x,
                         "y": s.subtitle_y,
                         "xanchor": "left",
@@ -1800,7 +1836,7 @@ class PlotlyPlot(Plot):
         if self.share_x_cols:
             for i in range(0, len(self.share_x_cols)):
                 if self.share_x_cols[i]:
-                    axis_str = Subplot.get_plotly_i_str("x", i + 1)
+                    axis_str = Subplot.get_plotly_id_str("x", i + 1)
                     for row in range(1, self.rows + 1):
                         fig.update_xaxes(matches=axis_str, row=row, col=i + 1)
 
