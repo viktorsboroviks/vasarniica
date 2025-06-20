@@ -375,6 +375,7 @@ class Scatter(Trace):
         marker_symbol: MarkerSymbol = None,
         marker_size: int = None,
         marker_yshift: float = 0,
+        textposition: str = None,
         fill: typing.Literal["tonexty", "tozeroy", None] = None,
         hoverinfo: str = None,
     ):
@@ -401,8 +402,7 @@ class Scatter(Trace):
             showannotation=showannotation,
         )
 
-        assert isinstance(text, (pd.Series, type(None)))
-        assert mode in ("lines", "lines+markers", "markers")
+        assert mode in ("lines", "lines+markers", "markers", "lines+text")
         assert isinstance(marker, (dict, type(None)))
         assert isinstance(marker_symbol, (MarkerSymbol, type(None)))
         assert isinstance(marker_size, (float, int, type(None)))
@@ -416,6 +416,7 @@ class Scatter(Trace):
         self.marker_symbol = marker_symbol
         self.marker_size = marker_size
         self.marker_yshift = marker_yshift
+        self.textposition = textposition
         self.fill = fill
         self.hoverinfo = hoverinfo
 
@@ -1453,6 +1454,7 @@ class PlotlyPlot(Plot):
                 line_width=line_width,
                 line_dash=PlotlyPlot._get_line_dash(trace.dash),
                 marker=marker,
+                textposition=trace.textposition,
                 fill=trace.fill,
                 hoverinfo=trace.hoverinfo,
                 showlegend=trace.showlegend,
