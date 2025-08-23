@@ -435,7 +435,7 @@ class ScatterHeatmap2d(Scatter):
         y: pd.Series,
         f: pd.Series,
         text: pd.Series = None,
-        colorscale: str = "Viridis",
+        colorscale: str = "bluered",
         marker_size: int = None,
         color: str | Color = None,
         width: int | float = None,
@@ -523,6 +523,54 @@ class Step(Trace):
         self.hoverinfo = hoverinfo
 
 
+class Heatmap:
+    """
+    Heatmap.
+    """
+
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
+    def __init__(
+        self,
+        z_data: typing.Iterable,
+        x_names: typing.Iterable = None,
+        y_names: typing.Iterable = None,
+        colorscale: str = "bluered",
+        name: str = None,
+    ):
+        """
+        Init.
+
+        Args:
+            color: string with the CSS color name or a color code.
+        """
+        assert isinstance(z_data, typing.Iterable)
+        assert isinstance(x_names, typing.Iterable)
+        assert isinstance(y_names, typing.Iterable)
+        assert isinstance(colorscale, str)
+        assert colorscale in (
+            "Viridis",
+            "Cividis",
+            "Plasma",
+            "Magma",
+            "Inferno",
+            "Blues",
+            "Greens",
+            "Reds",
+            "Greys",
+            "YlOrRd",
+            "YlGnBu",
+            "bluered",
+        )
+        assert isinstance(name, (str, type(None)))
+
+        self.z_data = z_data
+        self.x_names = x_names
+        self.y_names = y_names
+        self.colorscale = colorscale
+        self.name = name
+
+
 class Scatter3d:
     """
     Scatter 3D trace.
@@ -537,7 +585,7 @@ class Scatter3d:
         z: typing.Iterable,
         name: str = None,
         marker_size: int = 1,
-        colorscale: str = "Viridis",
+        colorscale: str = "bluered",
     ):
         """
         Init.
@@ -564,6 +612,7 @@ class Scatter3d:
             "Greys",
             "YlOrRd",
             "YlGnBu",
+            "bluered",
         )
 
         self.x = x
@@ -631,7 +680,7 @@ class Subplot:
         if traces is not None:
             assert len(traces) > 0
             for t in traces:
-                assert isinstance(t, (Trace, Bar, Histogram, CDF, Scatter3d))
+                assert isinstance(t, (Trace, Bar, Histogram, CDF, Heatmap, Scatter3d))
                 if isinstance(t, Scatter3d):
                     for ta in traces:
                         assert isinstance(ta, Scatter3d)
@@ -1128,7 +1177,9 @@ class PlotlyPlot(Plot):
                         if self.subplots[subplot_i].traces is not None:
                             for t in self.subplots[subplot_i].traces:
                                 if (
-                                    not isinstance(t, (Histogram, CDF, Bar, Scatter3d))
+                                    not isinstance(
+                                        t, (Histogram, CDF, Bar, Heatmap, Scatter3d)
+                                    )
                                     and t.secondary_y
                                 ):
                                     subplot_has_secondary_y = True
@@ -1169,7 +1220,9 @@ class PlotlyPlot(Plot):
                         type_str = "xy"
                         for t in s.traces:
                             if (
-                                not isinstance(t, (Histogram, CDF, Bar, Scatter3d))
+                                not isinstance(
+                                    t, (Histogram, CDF, Bar, Heatmap, Scatter3d)
+                                )
                                 and t.secondary_y
                             ):
                                 specs_entry["secondary_y"] = True
@@ -1568,6 +1621,26 @@ class PlotlyPlot(Plot):
         )
 
     @staticmethod
+    def _add_heatmap_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
+        assert isinstance(fig, go.Figure)
+        assert isinstance(subplot, Subplot)
+        assert isinstance(trace, Heatmap)
+
+        fig.add_trace(
+            go.Heatmap(
+                x=trace.x_names,
+                y=trace.y_names,
+                z=trace.z_data,
+                colorscale=trace.colorscale,
+                name=trace.name,
+                showlegend=False,
+                showscale=False,
+            ),
+            col=subplot.col,
+            row=subplot.row,
+        )
+
+    @staticmethod
     def _add_scatter3d_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
         assert isinstance(fig, go.Figure)
         assert isinstance(subplot, Subplot)
@@ -1616,6 +1689,8 @@ class PlotlyPlot(Plot):
                     PlotlyPlot._add_step_to_fig(fig, subplot, t)
                 elif isinstance(t, Candlestick):
                     PlotlyPlot._add_candlestick_to_fig(fig, subplot, t)
+                elif isinstance(t, Heatmap):
+                    PlotlyPlot._add_heatmap_to_fig(fig, subplot, t)
                 elif isinstance(t, Scatter3d):
                     PlotlyPlot._add_scatter3d_to_fig(fig, subplot, t)
                 else:
