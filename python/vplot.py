@@ -320,6 +320,7 @@ class Candlestick(Trace):
         yhigh: pd.Series,
         ylow: pd.Series,
         yclose: pd.Series,
+        skip_days_wo_data: bool = True,
         width: float = None,
         name: str = "OHLC",
         showlegend: bool = False,
@@ -333,6 +334,7 @@ class Candlestick(Trace):
         assert isinstance(yhigh, pd.Series)
         assert isinstance(ylow, pd.Series)
         assert isinstance(yclose, pd.Series)
+        assert isinstance(skip_days_wo_data, bool)
         assert isinstance(width, (int, float, type(None)))
         assert isinstance(name, str)
         assert isinstance(showlegend, bool)
@@ -344,6 +346,7 @@ class Candlestick(Trace):
         self.ylow = ylow
         self.yclose = yclose
         self.color = None
+        self.skip_days_wo_data = skip_days_wo_data
         self.width = width
         self.name = name
         self.showlegend = showlegend
@@ -1635,6 +1638,11 @@ class PlotlyPlot(Plot):
             line_width=PlotlyPlot._get_candlestick_line_width(trace.width),
             selector={"type": "candlestick"},
         )
+
+        xaxis_name = f"xaxis{subplot.row}" if subplot.row > 1 else "xaxis"
+        fig.layout[xaxis_name].type = "category"
+        # TODO: fix mixing orders for different scales on different subplots
+        # fig.update_xaxes(categoryorder="category ascending")
 
     @staticmethod
     def _add_heatmap_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
