@@ -1178,7 +1178,15 @@ class PlotlyPlot(Plot):
                             for t in self.subplots[subplot_i].traces:
                                 if (
                                     not isinstance(
-                                        t, (Histogram, CDF, Bar, Heatmap, Scatter3d)
+                                        t,
+                                        (
+                                            Histogram,
+                                            CDF,
+                                            Bar,
+                                            Heatmap,
+                                            Scatter3d,
+                                            Candlestick,
+                                        ),
                                     )
                                     and t.secondary_y
                                 ):
@@ -1221,7 +1229,15 @@ class PlotlyPlot(Plot):
                         for t in s.traces:
                             if (
                                 not isinstance(
-                                    t, (Histogram, CDF, Bar, Heatmap, Scatter3d)
+                                    t,
+                                    (
+                                        Histogram,
+                                        CDF,
+                                        Bar,
+                                        Heatmap,
+                                        Scatter3d,
+                                        Candlestick,
+                                    ),
                                 )
                                 and t.secondary_y
                             ):
@@ -1967,7 +1983,7 @@ class PlotlyPlot(Plot):
         Generate image file based on filename extension.
         """
         fig = self._get_fig()
-        fig.update(layout_xaxis_rangeslider_visible=False)
+        fig.update_xaxes(rangeslider_visible=False)
         fig.write_image(filename, scale=scale)
 
     def html(self, filename):
@@ -1994,5 +2010,5 @@ class PlotlyPlot(Plot):
             spikethickness=1,
         )  # in px
         # slider is conflicting with subplots
-        fig.update(layout_xaxis_rangeslider_visible=False)
+        fig.update_xaxes(rangeslider_visible=False)
         fig.write_html(filename)
