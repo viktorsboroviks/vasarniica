@@ -91,6 +91,7 @@ class Parameters:
         x: float = None,
         y: float = None,
         color: str | Color = None,
+        opacity: float = None,
         line_width: float = None,
         line_dash: Dash = None,
         text: str = None,
@@ -105,6 +106,7 @@ class Parameters:
         self.x = x
         self.y = y
         self.color = color
+        self.opacity = opacity
         self.line_width = line_width if line_width else 1.0
         self.line_dash = line_dash if line_dash else Dash.DOT
         self.text = text
@@ -149,6 +151,7 @@ class Parameters:
             x=get_float("x"),
             y=get_float("y"),
             color=data.get("color"),
+            opacity=get_float("opacity"),
             line_width=get_float("line_width"),
             line_dash=line_dash,
             text=data.get("text"),
@@ -347,6 +350,7 @@ class Trace:
         y: typing.Iterable,
         secondary_y: bool = False,
         color: str | Color = None,
+        opacity: float = None,
         width: float = None,
         dash: Dash = Dash.SOLID,
         name: str = None,
@@ -373,6 +377,7 @@ class Trace:
         self.y = y
         self.secondary_y = secondary_y
         self.color = color
+        self.opacity = opacity
         self.width = width
         self.dash = dash
         self.name = name
@@ -447,6 +452,7 @@ class Scatter(Trace):
         text: str | pd.Series = None,
         text_yshift: float = None,
         color: str | Color = None,
+        opacity: float = None,
         width: int | float = None,
         dash: Dash = Dash.SOLID,
         name: str = None,
@@ -476,6 +482,7 @@ class Scatter(Trace):
             y=y,
             secondary_y=secondary_y,
             color=color,
+            opacity=opacity,
             width=width,
             dash=dash,
             name=name,
@@ -570,6 +577,7 @@ class Step(Trace):
         text: pd.Series = None,
         secondary_y: bool = False,
         color: str | Color = None,
+        opacity: float = None,
         width: int | float = None,
         dash: Dash = Dash.SOLID,
         name: str = None,
@@ -590,6 +598,7 @@ class Step(Trace):
             y=y,
             secondary_y=secondary_y,
             color=color,
+            opacity=opacity,
             width=width,
             dash=dash,
             name=name,
@@ -1604,6 +1613,7 @@ class PlotlyPlot(Plot):
                 line_color=color,
                 line_width=line_width,
                 line_dash=PlotlyPlot._get_line_dash(trace.dash),
+                opacity=trace.opacity,
                 marker=marker,
                 fill=trace.fill,
                 hoverinfo=trace.hoverinfo,
