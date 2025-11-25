@@ -84,10 +84,12 @@ class Dash(enum.Enum):
     LONGDASHDOT = 6
 
 
-class Label:
+class Parameters:
     def __init__(
         self,
         mode: typing.Literal["lines", "lines+markers", "markers"] = "lines",
+        x: float = None,
+        y: float = None,
         color: str | Color = None,
         line_width: float = None,
         line_dash: Dash = None,
@@ -100,6 +102,8 @@ class Label:
         # set all default values here if input is None
         # this allows for easy deseralization later in from_str()
         self.mode = mode if mode else "lines"
+        self.x = x
+        self.y = y
         self.color = color
         self.line_width = line_width if line_width else 1.0
         self.line_dash = line_dash if line_dash else Dash.DOT
@@ -140,8 +144,10 @@ class Label:
             if data.get("marker_symbol") in MarkerSymbol.__members__
             else None
         )
-        return Label(
+        return Parameters(
             mode=data.get("mode"),
+            x=get_float("x"),
+            y=get_float("y"),
             color=data.get("color"),
             line_width=get_float("line_width"),
             line_dash=line_dash,
