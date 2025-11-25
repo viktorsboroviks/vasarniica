@@ -5,6 +5,8 @@ Plotting.
 # pylint: disable=too-many-lines
 import base64
 import enum
+import dataclasses
+import json
 import pathlib
 import typing
 import numpy as np
@@ -80,6 +82,75 @@ class Dash(enum.Enum):
     LONGDASH = 4
     DASHDOT = 5
     LONGDASHDOT = 6
+
+
+class Label:
+    def __init__(
+        self,
+        mode: typing.Literal["lines", "lines+markers", "markers"] = "lines",
+        color: str | Color = None,
+        line_width: float = None,
+        line_dash: Dash = None,
+        text: str = None,
+        text_yshift: float = None,
+        marker_symbol: MarkerSymbol = None,
+        marker_size: float = None,
+        marker_yshift: float = None,
+    ):
+        # set all default values here if input is None
+        # this allows for easy deseralization later in from_str()
+        self.mode = mode if mode else "lines"
+        self.color = color
+        self.line_width = line_width if line_width else 1.0
+        self.line_dash = line_dash if line_dash else Dash.DOT
+        self.text = text
+        self.text_yshift = text_yshift
+        self.marker_symbol = marker_symbol
+        self.marker_size = marker_size
+        self.marker_yshift = marker_yshift if marker_yshift else 0.0
+
+    def to_str(self) -> str:
+        result = {}
+        for k, v in self.__dict__.items():
+            if v is None:
+                continue
+            if isinstance(v, Color):
+                result[k] = Color.to_css(v)
+                continue
+            if isinstance(v, (Dash, MarkerSymbol)):
+                result[k] = v.name
+                continue
+            result[k] = v
+        return json.dumps(result)
+
+    @staticmethod
+    def from_str(label_str: str) -> "Label":
+        data = json.loads(label_str)
+
+        def get_float(key):
+            return float(data.get(key)) if data.get(key) else None
+
+        line_dash = (
+            Dash[data["line_dash"]]
+            if data.get("line_dash") in Dash.__members__
+            else None
+        )
+        marker_symbol = (
+            MarkerSymbol[data["marker_symbol"]]
+            if data.get("marker_symbol") in MarkerSymbol.__members__
+            else None
+        )
+        return Label(
+            mode=data.get("mode"),
+            color=data.get("color"),
+            line_width=get_float("line_width"),
+            line_dash=line_dash,
+            text=data.get("text"),
+            text_yshift=get_float("text_yshift"),
+            marker_symbol=marker_symbol,
+            marker_size=get_float("marker_size"),
+            marker_yshift=get_float("marker_yshift"),
+        )
 
 
 # pylint: disable=too-few-public-methods
@@ -320,7 +391,7 @@ class Candlestick(Trace):
         yhigh: pd.Series,
         ylow: pd.Series,
         yclose: pd.Series,
-        skip_days_wo_data: bool = True,
+        skip_no_data: bool = True,
         width: float = None,
         name: str = "OHLC",
         showlegend: bool = False,
@@ -334,7 +405,7 @@ class Candlestick(Trace):
         assert isinstance(yhigh, pd.Series)
         assert isinstance(ylow, pd.Series)
         assert isinstance(yclose, pd.Series)
-        assert isinstance(skip_days_wo_data, bool)
+        assert isinstance(skip_no_data, bool)
         assert isinstance(width, (int, float, type(None)))
         assert isinstance(name, str)
         assert isinstance(showlegend, bool)
@@ -345,8 +416,8 @@ class Candlestick(Trace):
         self.yhigh = yhigh
         self.ylow = ylow
         self.yclose = yclose
+        self.skip_no_data = skip_no_data
         self.color = None
-        self.skip_days_wo_data = skip_days_wo_data
         self.width = width
         self.name = name
         self.showlegend = showlegend
@@ -365,8 +436,10 @@ class Scatter(Trace):
         self,
         x: pd.Index,
         y: pd.Series,
-        text: pd.Series = None,
         secondary_y: bool = False,
+        skip_no_data: bool = False,
+        text: str | pd.Series = None,
+        text_yshift: float = None,
         color: str | Color = None,
         width: int | float = None,
         dash: Dash = Dash.SOLID,
@@ -378,7 +451,6 @@ class Scatter(Trace):
         marker_symbol: MarkerSymbol = None,
         marker_size: int = None,
         marker_yshift: float = 0,
-        textposition: str = None,
         fill: typing.Literal["tonexty", "tozeroy", None] = None,
         hoverinfo: str = None,
     ):
@@ -405,6 +477,7 @@ class Scatter(Trace):
             showannotation=showannotation,
         )
 
+        assert isinstance(skip_no_data, bool)
         assert mode in ("lines", "lines+markers", "markers", "lines+text")
         assert isinstance(marker, (dict, type(None)))
         assert isinstance(marker_symbol, (MarkerSymbol, type(None)))
@@ -413,13 +486,14 @@ class Scatter(Trace):
         assert fill in ("tonexty", "tozeroy", None)
         assert isinstance(hoverinfo, (str, type(None)))
 
-        self.text = text
+        self.skip_no_data = skip_no_data
         self.mode = mode
+        self.text = text
+        self.text_yshift = text_yshift
         self.marker = marker
         self.marker_symbol = marker_symbol
         self.marker_size = marker_size
         self.marker_yshift = marker_yshift
-        self.textposition = textposition
         self.fill = fill
         self.hoverinfo = hoverinfo
 
@@ -1519,14 +1593,12 @@ class PlotlyPlot(Plot):
             go.Scatter(
                 x=trace.x,
                 y=trace.y,
-                text=trace.text,
                 stackgroup=stackgroup,
                 mode=trace.mode,
                 line_color=color,
                 line_width=line_width,
                 line_dash=PlotlyPlot._get_line_dash(trace.dash),
                 marker=marker,
-                textposition=trace.textposition,
                 fill=trace.fill,
                 hoverinfo=trace.hoverinfo,
                 showlegend=trace.showlegend,
@@ -1540,6 +1612,17 @@ class PlotlyPlot(Plot):
             col=subplot.col,
             row=subplot.row,
         )
+
+        if trace.text:
+            for x, y in zip(trace.x, trace.y):
+                fig.add_annotation(
+                    x=x,
+                    y=y,
+                    text=trace.text,
+                    yshift=trace.text_yshift,
+                    col=subplot.col,
+                    row=subplot.row,
+                )
 
         if trace.showannotation:
             # I also tried adding text trace over the particular data points,
@@ -1557,6 +1640,14 @@ class PlotlyPlot(Plot):
                 col=subplot.col,
                 row=subplot.row,
             )
+
+        if trace.skip_no_data:
+            xaxis_name = f"xaxis{subplot.row}" if subplot.row > 1 else "xaxis"
+            fig.update_xaxes(
+                type="category", matches="x", col=subplot.col, row=subplot.row
+            )
+            # TODO: fix mixing orders for different scales on different subplots
+            # fig.update_xaxes(categoryorder="category ascending")
 
     @staticmethod
     def _add_step_to_fig(
@@ -1639,10 +1730,13 @@ class PlotlyPlot(Plot):
             selector={"type": "candlestick"},
         )
 
-        xaxis_name = f"xaxis{subplot.row}" if subplot.row > 1 else "xaxis"
-        fig.layout[xaxis_name].type = "category"
-        # TODO: fix mixing orders for different scales on different subplots
-        # fig.update_xaxes(categoryorder="category ascending")
+        if trace.skip_no_data:
+            xaxis_name = f"xaxis{subplot.row}" if subplot.row > 1 else "xaxis"
+            fig.update_xaxes(
+                type="category", matches="x", col=subplot.col, row=subplot.row
+            )
+            # TODO: fix mixing orders for different scales on different subplots
+            # fig.update_xaxes(categoryorder="category ascending")
 
     @staticmethod
     def _add_heatmap_to_fig(fig: go.Figure, subplot: Subplot, trace: Trace):
