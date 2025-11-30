@@ -6,8 +6,9 @@ refs:
 - marker https://plotly.com/python/marker-style
 """
 
+import copy
 import enum
-import itertools
+import typing
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -27,15 +28,73 @@ class Color(enum.Enum):
     BLACK = "black"
 
 
-class PlotlySubplot:
-    # TODO: add domain or col/row
-    # TODO: set reference to mention in added traces/data
-    def __init__(self, domain=None):
+class Figure:
+    def __init__(self):
+        self.subplots = []
         self.data = []
         self.layout = {}
 
+    def add_subplot(self, skip_no_data=False) -> "Subplot":
+        new_subplot = Subplot(self)
+        self.subplots.append(new_subplot)
+
+        if skip_no_data:
+            self.layout[new_subplot.xaxis_layout_id] = dict(
+                type="category",
+                rangeslider=dict(visible=False),
+                anchor=new_subplot.yaxis_id,
+            )
+
+        return new_subplot
+
+    def to_go(self) -> go.Figure:
+        fig = go.Figure(
+            data=self.data,
+            layout=self.layout,
+        )
+        return fig
+
+    def show(self):
+        self.to_go().show()
+
+    def to_html(self, filepath):
+        self.to_go().write_html(filepath)
+
+
+class Subplot:
+    # TODO: add domain or col/row
+    # TODO: set reference to mention in added traces/data
+    def __init__(self, fig: Figure):
+        def _new_axis_id(fig: Figure, axis=typing.Literal["x", "y"]) -> str:
+            """
+            Create new axis id for subplot.
+            """
+            assert axis in ["x", "y"]
+            if len(fig.subplots) == 0:
+                return axis
+            return f"{axis}{len(fig.subplots)}"
+
+        def _new_axis_layout_id(fig: Figure, axis=typing.Literal["x", "y"]) -> str:
+            """
+            Create new axis layout id for subplot.
+            """
+            assert axis in ["x", "y"]
+            if len(fig.subplots) == 0:
+                return f"{axis}axis"
+            return f"{axis}axis{len(fig.subplots)}"
+
+        self.fig = fig
+        self.xaxis_id = _new_axis_id(fig, "x")
+        self.yaxis_id = _new_axis_id(fig, "y")
+        self.xaxis_layout_id = _new_axis_layout_id(fig, "x")
+        self.yaxis_layout_id = _new_axis_layout_id(fig, "y")
+
     def add(self, go):
-        self.data.append(go)
+        # copy object to avoid modifying original
+        saved_go = copy.copy(go)
+        saved_go.xaxis = self.xaxis_id
+        saved_go.yaxis = self.yaxis_id
+        self.fig.data.append(saved_go)
 
     def add_ohlc(
         self,
@@ -46,11 +105,10 @@ class PlotlySubplot:
         col_close="Close",
         line_width=0.7,
         name="ohlc",
-        skip_no_data=True,
     ):
         assert type(data_df.index) == pd.DatetimeIndex
 
-        self.data.append(
+        self.fig.data.append(
             go.Candlestick(
                 x=data_df.index,
                 open=data_df[col_open],
@@ -59,30 +117,7 @@ class PlotlySubplot:
                 close=data_df[col_close],
                 name=name,
                 line=dict(width=line_width),
-            ),
-        )
-
-        # TODO: make generic to target related x,y
-        if skip_no_data:
-            self.layout["xaxis"] = dict(
-                type="category",
-                rangeslider=dict(visible=False),
-                anchor="y",
+                xaxis=self.xaxis_id,
+                yaxis=self.yaxis_id,
             )
-
-
-class PlotlyPlot:
-    def __init__(self, subplots: list[PlotlySubplot]):
-        data = list(itertools.chain.from_iterable(s.data for s in subplots))
-        layout = dict(itertools.chain.from_iterable(s.layout.items() for s in subplots))
-
-        self.fig = go.Figure(
-            data=data,
-            layout=layout,
         )
-
-    def show(self):
-        self.fig.show()
-
-    def to_html(self, filepath):
-        self.fig.write_html(filepath)
