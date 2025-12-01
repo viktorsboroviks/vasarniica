@@ -34,16 +34,30 @@ class Figure:
         self.data = []
         self.layout = {}
 
-    def add_subplot(self, skip_no_data=False) -> "Subplot":
-        new_subplot = Subplot(self)
+    def add_subplot(
+        self,
+        x_domain: typing.Tuple[float, float] = None,
+        y_domain: typing.Tuple[float, float] = None,
+        x_share_with: "Subplot" = None,
+        x_skip_no_data=False,
+        rangeslider_visible=False,
+    ) -> "Subplot":
+        new_subplot = Subplot(self, x_share_with=x_share_with)
         self.subplots.append(new_subplot)
 
-        if skip_no_data:
+        if x_domain:
+            self.layout[new_subplot.xaxis_layout_id] = dict(domain=x_domain)
+        if y_domain:
+            self.layout[new_subplot.yaxis_layout_id] = dict(domain=y_domain)
+
+        assert not (x_skip_no_data and x_share_with)
+        if not x_share_with:
             self.layout[new_subplot.xaxis_layout_id] = dict(
-                type="category",
-                rangeslider=dict(visible=False),
+                rangeslider=dict(visible=rangeslider_visible),
                 anchor=new_subplot.yaxis_id,
             )
+        if x_skip_no_data:
+            self.layout[new_subplot.xaxis_layout_id]["type"] = "category"
 
         return new_subplot
 
@@ -64,7 +78,7 @@ class Figure:
 class Subplot:
     # TODO: add domain or col/row
     # TODO: set reference to mention in added traces/data
-    def __init__(self, fig: Figure):
+    def __init__(self, fig: Figure, x_share_with: "Subplot" = None):
         def _new_axis_id(fig: Figure, axis=typing.Literal["x", "y"]) -> str:
             """
             Create new axis id for subplot.
@@ -72,7 +86,7 @@ class Subplot:
             assert axis in ["x", "y"]
             if len(fig.subplots) == 0:
                 return axis
-            return f"{axis}{len(fig.subplots)}"
+            return f"{axis}{len(fig.subplots)+1}"
 
         def _new_axis_layout_id(fig: Figure, axis=typing.Literal["x", "y"]) -> str:
             """
@@ -81,12 +95,17 @@ class Subplot:
             assert axis in ["x", "y"]
             if len(fig.subplots) == 0:
                 return f"{axis}axis"
-            return f"{axis}axis{len(fig.subplots)}"
+            return f"{axis}axis{len(fig.subplots)+1}"
 
         self.fig = fig
-        self.xaxis_id = _new_axis_id(fig, "x")
-        self.yaxis_id = _new_axis_id(fig, "y")
+
+        if x_share_with:
+            self.xaxis_id = x_share_with.xaxis_id
+        else:
+            self.xaxis_id = _new_axis_id(fig, "x")
+
         self.xaxis_layout_id = _new_axis_layout_id(fig, "x")
+        self.yaxis_id = _new_axis_id(fig, "y")
         self.yaxis_layout_id = _new_axis_layout_id(fig, "y")
 
     def add(self, go):
