@@ -11,6 +11,7 @@ import enum
 import typing
 import pandas as pd
 import plotly.graph_objects as go
+import webcolors
 
 
 class Color(enum.Enum):
@@ -27,37 +28,108 @@ class Color(enum.Enum):
     GREY = "grey"
     BLACK = "black"
 
+    @staticmethod
+    def to_rgba_str(css_color_name, alpha=1.0) -> str:
+        r, g, b = webcolors.name_to_rgb(css_color_name)
+        return f"rgba({r},{g},{b},{alpha})"
 
-class Figure:
-    def __init__(self):
+
+DEFAULT_LINE_WIDTH = 0.7
+
+
+class PlotlyFigure:
+    def __init__(
+        self,
+        font_size: int = 8,
+        template: str = "simple_white",
+        showlegend: bool = False,
+    ):
+        """
+        template - set manually because of certain visual bugs
+                   in plotly default templates
+        """
         self.subplots = []
         self.data = []
         self.layout = {}
+        self.layout["shapes"] = []
+        self.layout["font"] = {}
+        self.layout["font"]["size"] = font_size
+
+        self.template = template
+        if template == "simple_white":
+            self.layout["font"]["color"] = "black"
+            self.layout["paper_bgcolor"] = "white"
+            self.layout["plot_bgcolor"] = "white"
+
+        self.layout["showlegend"] = showlegend
+
+        # hover over all subplots at once
+        self.layout["hovermode"] = "x"
+        self.layout["hoversubplots"] = "axis"
 
     def add_subplot(
         self,
         x_domain: typing.Tuple[float, float] = None,
         y_domain: typing.Tuple[float, float] = None,
-        x_share_with: "Subplot" = None,
+        x_share_with: "PlotlySubplot" = None,
         x_skip_no_data=False,
         rangeslider_visible=False,
-    ) -> "Subplot":
-        new_subplot = Subplot(self, x_share_with=x_share_with)
+    ) -> "PlotlySubplot":
+        new_subplot = PlotlySubplot(self, x_share_with=x_share_with)
         self.subplots.append(new_subplot)
 
+        self.layout[new_subplot.xaxis_layout_id] = {}
+        self.layout[new_subplot.yaxis_layout_id] = {}
+
         if x_domain:
-            self.layout[new_subplot.xaxis_layout_id] = dict(domain=x_domain)
+            self.layout[new_subplot.xaxis_layout_id]["domain"] = x_domain
         if y_domain:
-            self.layout[new_subplot.yaxis_layout_id] = dict(domain=y_domain)
+            self.layout[new_subplot.yaxis_layout_id]["domain"] = y_domain
 
         assert not (x_skip_no_data and x_share_with)
         if not x_share_with:
-            self.layout[new_subplot.xaxis_layout_id] = dict(
-                rangeslider=dict(visible=rangeslider_visible),
-                anchor=new_subplot.yaxis_id,
+            self.layout[new_subplot.xaxis_layout_id]["rangeslider"] = dict(
+                visible=rangeslider_visible
             )
+            self.layout[new_subplot.xaxis_layout_id]["anchor"] = new_subplot.yaxis_id
         if x_skip_no_data:
             self.layout[new_subplot.xaxis_layout_id]["type"] = "category"
+
+        if self.template == "simple_white":
+            self.layout[new_subplot.xaxis_layout_id]["showgrid"] = False
+            self.layout[new_subplot.xaxis_layout_id]["zeroline"] = False
+            self.layout[new_subplot.xaxis_layout_id]["showline"] = True
+            self.layout[new_subplot.xaxis_layout_id]["linecolor"] = "black"
+            self.layout[new_subplot.xaxis_layout_id]["ticks"] = "outside"
+            self.layout[new_subplot.xaxis_layout_id]["tickcolor"] = "black"
+
+            self.layout[new_subplot.yaxis_layout_id]["showgrid"] = False
+            self.layout[new_subplot.yaxis_layout_id]["zeroline"] = False
+            self.layout[new_subplot.yaxis_layout_id]["showline"] = True
+            self.layout[new_subplot.yaxis_layout_id]["linecolor"] = "black"
+            self.layout[new_subplot.yaxis_layout_id]["ticks"] = "outside"
+            self.layout[new_subplot.yaxis_layout_id]["tickcolor"] = "black"
+
+        # crosshair
+        self.layout[new_subplot.xaxis_layout_id]["showspikes"] = True
+        self.layout[new_subplot.xaxis_layout_id]["spikemode"] = "across"
+        self.layout[new_subplot.xaxis_layout_id]["spikesnap"] = "cursor"
+        self.layout[new_subplot.xaxis_layout_id]["spikedash"] = "solid"
+        self.layout[new_subplot.xaxis_layout_id]["spikecolor"] = Color.to_rgba_str(
+            "black", 0.15
+        )
+        # workaround to disable border lines around spikes
+        # ref: https://stackoverflow.com/questions/64287427/how-to-change-white-border-color-around-plotly-spike-lines
+        self.layout[new_subplot.xaxis_layout_id]["spikethickness"] = -2
+
+        self.layout[new_subplot.yaxis_layout_id]["showspikes"] = True
+        self.layout[new_subplot.yaxis_layout_id]["spikemode"] = "across"
+        self.layout[new_subplot.yaxis_layout_id]["spikesnap"] = "cursor"
+        self.layout[new_subplot.yaxis_layout_id]["spikedash"] = "solid"
+        self.layout[new_subplot.yaxis_layout_id]["spikecolor"] = Color.to_rgba_str(
+            "black", 0.15
+        )
+        self.layout[new_subplot.yaxis_layout_id]["spikethickness"] = -2
 
         return new_subplot
 
@@ -75,11 +147,11 @@ class Figure:
         self.to_go().write_html(filepath)
 
 
-class Subplot:
+class PlotlySubplot:
     # TODO: add domain or col/row
     # TODO: set reference to mention in added traces/data
-    def __init__(self, fig: Figure, x_share_with: "Subplot" = None):
-        def _new_axis_id(fig: Figure, axis=typing.Literal["x", "y"]) -> str:
+    def __init__(self, fig: PlotlyFigure, x_share_with: "PlotlySubplot" = None):
+        def _new_axis_id(fig: PlotlyFigure, axis=typing.Literal["x", "y"]) -> str:
             """
             Create new axis id for subplot.
             """
@@ -88,7 +160,9 @@ class Subplot:
                 return axis
             return f"{axis}{len(fig.subplots)+1}"
 
-        def _new_axis_layout_id(fig: Figure, axis=typing.Literal["x", "y"]) -> str:
+        def _new_axis_layout_id(
+            fig: PlotlyFigure, axis=typing.Literal["x", "y"]
+        ) -> str:
             """
             Create new axis layout id for subplot.
             """
@@ -122,7 +196,9 @@ class Subplot:
         col_high="High",
         col_low="Low",
         col_close="Close",
-        line_width=0.7,
+        color_up=Color.GREEN.value,
+        color_down=Color.RED.value,
+        line_width=DEFAULT_LINE_WIDTH,
         name="ohlc",
     ):
         assert type(data_df.index) == pd.DatetimeIndex
@@ -134,9 +210,63 @@ class Subplot:
                 high=data_df[col_high],
                 low=data_df[col_low],
                 close=data_df[col_close],
-                name=name,
+                increasing_line_color=color_up,
+                increasing_fillcolor=color_up,
+                decreasing_line_color=color_down,
+                decreasing_fillcolor=color_down,
                 line=dict(width=line_width),
+                name=name,
                 xaxis=self.xaxis_id,
                 yaxis=self.yaxis_id,
+            )
+        )
+
+    def add_hline(
+        self,
+        y,
+        line_color=Color.BLUE.value,
+        line_width=DEFAULT_LINE_WIDTH,
+        line_dash="solid",
+        opacity=1.0,
+    ):
+        self.fig.layout["shapes"].append(
+            dict(
+                type="line",
+                xref="paper",
+                yref=self.yaxis_id,
+                x0=0,
+                x1=1,
+                y0=y,
+                y1=y,
+                line=dict(
+                    color=Color.to_rgba_str(line_color, opacity),
+                    width=line_width,
+                    dash=line_dash,
+                ),
+            )
+        )
+
+    def add_vline(
+        self,
+        x,
+        line_color=Color.BLUE.value,
+        line_width=DEFAULT_LINE_WIDTH,
+        line_dash="solid",
+        opacity=1.0,
+    ):
+        self.fig.layout["shapes"].append(
+            dict(
+                type="line",
+                xref=self.xaxis_id,
+                yref="paper",
+                x0=x,
+                x1=x,
+                y0=0,
+                y1=1,
+                line=dict(
+                    color=Color.to_rgba_str(line_color, opacity),
+                    width=line_width,
+                    dash=line_dash,
+                ),
             )
         )
