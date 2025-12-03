@@ -30,6 +30,8 @@ class Color(enum.Enum):
 
     @staticmethod
     def to_rgba_str(css_color_name, alpha=1.0) -> str:
+        if css_color_name is None:
+            return "rgba(0,0,0,0)"
         r, g, b = webcolors.name_to_rgb(css_color_name)
         return f"rgba({r},{g},{b},{alpha})"
 
@@ -75,7 +77,12 @@ class PlotlyFigure:
         x_skip_no_data=False,
         rangeslider_visible=False,
     ) -> "PlotlySubplot":
-        new_subplot = PlotlySubplot(self, x_share_with=x_share_with)
+        new_subplot = PlotlySubplot(
+            self,
+            x_domain=x_domain,
+            y_domain=y_domain,
+            x_share_with=x_share_with,
+        )
         self.subplots.append(new_subplot)
 
         self.layout[new_subplot.xaxis_layout_id] = {}
@@ -150,7 +157,13 @@ class PlotlyFigure:
 class PlotlySubplot:
     # TODO: add domain or col/row
     # TODO: set reference to mention in added traces/data
-    def __init__(self, fig: PlotlyFigure, x_share_with: "PlotlySubplot" = None):
+    def __init__(
+        self,
+        fig: PlotlyFigure,
+        x_domain,
+        y_domain,
+        x_share_with: "PlotlySubplot" = None,
+    ):
         def _new_axis_id(fig: PlotlyFigure, axis=typing.Literal["x", "y"]) -> str:
             """
             Create new axis id for subplot.
@@ -172,6 +185,8 @@ class PlotlySubplot:
             return f"{axis}axis{len(fig.subplots)+1}"
 
         self.fig = fig
+        self.x_domain = x_domain
+        self.y_domain = y_domain
 
         if x_share_with:
             self.xaxis_id = x_share_with.xaxis_id
@@ -229,6 +244,7 @@ class PlotlySubplot:
         line_dash="solid",
         opacity=1.0,
     ):
+        # fig.add_hline not used because go.Figure is not created yet
         self.fig.layout["shapes"].append(
             dict(
                 type="line",
@@ -268,5 +284,34 @@ class PlotlySubplot:
                     width=line_width,
                     dash=line_dash,
                 ),
+            )
+        )
+
+    def add_vrect(
+        self,
+        x0,
+        x1,
+        line_color=None,
+        line_opacity=1.0,
+        line_width=0,
+        line_dash=None,
+        fill_color=Color.GREY.value,
+        fill_opacity=1.0,
+    ):
+        self.fig.layout["shapes"].append(
+            dict(
+                type="rect",
+                xref=self.xaxis_id,
+                yref="paper",
+                x0=x0,
+                x1=x1,
+                y0=self.y_domain[0] if self.y_domain else 0,
+                y1=self.y_domain[1] if self.y_domain else 1,
+                line=dict(
+                    color=Color.to_rgba_str(line_color, line_opacity),
+                    width=line_width,
+                    dash=line_dash,
+                ),
+                fillcolor=Color.to_rgba_str(fill_color, fill_opacity),
             )
         )
