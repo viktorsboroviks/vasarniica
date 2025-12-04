@@ -54,6 +54,7 @@ class PlotlyFigure:
         self.data = []
         self.layout = {}
         self.layout["shapes"] = []
+        self.layout["annotations"] = []
         self.layout["font"] = {}
         self.layout["font"]["size"] = font_size
 
@@ -313,5 +314,45 @@ class PlotlySubplot:
                     dash=line_dash,
                 ),
                 fillcolor=Color.to_rgba_str(fill_color, fill_opacity),
+            )
+        )
+
+    def add_annotation(
+        self,
+        x,
+        y,
+        text,
+        font_color=Color.BLACK.value,
+        font_size=10,
+        ax=0,
+        ay=0,
+        show_arrow=False,
+        arrow_size=1,
+        arrow_head=1,
+        arrow_color=Color.BLACK.value,
+        arrow_opacity=1.0,
+    ):
+        if show_arrow:
+            arrowcolor = Color.to_rgba_str(arrow_color, arrow_opacity)
+        else:
+            arrowcolor = Color.to_rgba_str(None, 0.0)
+
+        self.fig.layout["annotations"].append(
+            dict(
+                x=x,
+                y=y,
+                xref=self.xaxis_id,
+                yref=self.yaxis_id,
+                text=text,
+                showarrow=True,
+                arrowhead=arrow_head,
+                arrowsize=arrow_size,
+                arrowcolor=arrowcolor,
+                ax=ax,
+                ay=ay,
+                font=dict(
+                    color=font_color,
+                    size=font_size,
+                ),
             )
         )
