@@ -4,7 +4,7 @@ import pandas as pd
 
 def partitions(
     df: pd.DataFrame,
-    expr: str | typing.Callable[[pd.Series], typing.Any],
+    apply: pd.Series | str | typing.Callable[[pd.Series], typing.Any],
     i_no_gaps: bool = True,
 ):
     """
@@ -14,17 +14,21 @@ def partitions(
     Parameters
     ----------
     df : pd.DataFrame
-    expr : str | callable
-        Column name or function(row) → value
+    apply : pd.series | str | callable
+        Series, column name or function(row) → value
     i_no_gaps : bool, default True
         If True, i_end is the index of the beginning of the next partition.
     """
-    if isinstance(expr, str):
-        # simple column
-        vals = df[expr]
-    else:
+    if isinstance(apply, pd.Series):
+        vals = apply
+    elif isinstance(apply, str):
+        # column name
+        vals = df[apply]
+    elif isinstance(apply, typing.Callable):
         # apply callable row-wise
-        vals = df.apply(expr, axis=1)
+        vals = df.apply(apply, axis=1)
+    else:
+        raise ValueError("expr must be pd.series, str or callable")
 
     group_id = vals.ne(vals.shift()).cumsum()
 
