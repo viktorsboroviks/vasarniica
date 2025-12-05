@@ -46,11 +46,14 @@ class PlotlyFigure:
         font_size: int = 8,
         template: str = "simple_white",
         showlegend: bool = False,
+        dry_run: bool = False,
     ):
         """
         template - set manually because of certain visual bugs
                    in plotly default templates
         """
+        self.dry_run = dry_run
+
         self.subplots = []
         self.data = []
         self.layout = {}
@@ -86,6 +89,8 @@ class PlotlyFigure:
             x_share_with=x_share_with,
         )
         self.subplots.append(new_subplot)
+        if self.dry_run:
+            return new_subplot
 
         self.layout[new_subplot.xaxis_layout_id] = {}
         self.layout[new_subplot.yaxis_layout_id] = {}
@@ -150,9 +155,15 @@ class PlotlyFigure:
         return fig
 
     def show(self):
+        if self.dry_run:
+            return
+
         self.to_go().show()
 
     def to_html(self, filepath):
+        if self.dry_run:
+            return
+
         self.to_go().write_html(filepath)
 
 
@@ -200,6 +211,9 @@ class PlotlySubplot:
         self.yaxis_layout_id = _new_axis_layout_id(fig, "y")
 
     def add(self, go):
+        if self.fig.dry_run:
+            return
+
         # copy object to avoid modifying original
         saved_go = copy.copy(go)
         saved_go.xaxis = self.xaxis_id
@@ -218,6 +232,9 @@ class PlotlySubplot:
         line_width=DEFAULT_LINE_WIDTH,
         name="ohlc",
     ):
+        if self.fig.dry_run:
+            return
+
         assert type(data_df.index) == pd.DatetimeIndex
 
         self.fig.data.append(
@@ -246,6 +263,9 @@ class PlotlySubplot:
         line_dash="solid",
         opacity=1.0,
     ):
+        if self.fig.dry_run:
+            return
+
         # fig.add_hline not used because go.Figure is not created yet
         self.fig.layout["shapes"].append(
             dict(
@@ -272,6 +292,9 @@ class PlotlySubplot:
         line_dash="solid",
         opacity=1.0,
     ):
+        if self.fig.dry_run:
+            return
+
         self.fig.layout["shapes"].append(
             dict(
                 type="line",
@@ -300,6 +323,9 @@ class PlotlySubplot:
         fill_color=Color.GREY.value,
         fill_opacity=1.0,
     ):
+        if self.fig.dry_run:
+            return
+
         self.fig.layout["shapes"].append(
             dict(
                 type="rect",
@@ -333,6 +359,9 @@ class PlotlySubplot:
         arrow_color=Color.BLACK.value,
         arrow_opacity=1.0,
     ):
+        if self.fig.dry_run:
+            return
+
         if show_arrow:
             arrowcolor = Color.to_rgba_str(arrow_color, arrow_opacity)
         else:
