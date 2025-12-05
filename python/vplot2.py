@@ -27,6 +27,7 @@ class Color(enum.Enum):
     LIGHT_GREY = "lightgrey"
     GREY = "grey"
     BLACK = "black"
+    WHITE = "white"
 
     @staticmethod
     def to_rgba_str(css_color_name, alpha=1.0) -> str:
