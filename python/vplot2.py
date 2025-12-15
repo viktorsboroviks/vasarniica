@@ -9,6 +9,7 @@ refs:
 import copy
 import enum
 import typing
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import webcolors
@@ -385,4 +386,91 @@ class PlotlySubplot:
                     size=font_size,
                 ),
             )
+        )
+
+    def add_histogram(
+        self,
+        data_count,
+        data_index,
+        is_vertical=False,
+        line_color=None,
+        line_opacity=1.0,
+        line_width=DEFAULT_LINE_WIDTH,
+        line_dash="solid",
+        fill_color=Color.GREY.value,
+        fill_opacity=1.0,
+        name=None,
+    ):
+        """
+        count, index = np.histogram(
+            a=data,
+            bins=nbins,
+            range=data_range,
+            density=is_probability_density,
+        )
+        """
+        if self.fig.dry_run:
+            return
+
+        if is_vertical:
+            x = data_count
+            y = data_index
+            fill = "tozerox"
+        else:
+            x = data_index
+            y = data_count
+            fill = "tozeroy"
+
+        gobj = go.Scatter(
+            mode="lines",
+            x=x,
+            y=y,
+            line={"shape": "hvh"},
+            line_color=Color.to_rgba_str(line_color, line_opacity),
+            line_width=line_width,
+            line_dash=line_dash,
+            fill=fill,
+            fillcolor=Color.to_rgba_str(fill_color, fill_opacity),
+            name=name,
+            yaxis=self.yaxis_id,
+            xaxis=self.xaxis_id,
+        )
+        self.fig.data.append(gobj)
+
+    def add_histogram2(
+        self,
+        data,
+        data_range: tuple[float, float] = None,
+        nbins=20,
+        is_probability_density=False,
+        is_vertical=False,
+        line_color=None,
+        line_opacity=1.0,
+        line_width=DEFAULT_LINE_WIDTH,
+        line_dash="solid",
+        fill_color=Color.GREY.value,
+        fill_opacity=1.0,
+        name=None,
+    ):
+        if self.fig.dry_run:
+            return
+
+        count, index = np.histogram(
+            a=data,
+            bins=nbins,
+            range=data_range,
+            density=is_probability_density,
+        )
+
+        self.add_histogram(
+            data_count=count,
+            data_index=index,
+            is_vertical=is_vertical,
+            line_color=line_color,
+            line_opacity=line_opacity,
+            line_width=line_width,
+            line_dash=line_dash,
+            fill_color=fill_color,
+            fill_opacity=fill_opacity,
+            name=name,
         )
