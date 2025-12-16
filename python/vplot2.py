@@ -219,6 +219,8 @@ class PlotlySubplot:
         saved_go = copy.copy(go)
         saved_go.xaxis = self.xaxis_id
         saved_go.yaxis = self.yaxis_id
+        # do not truncate long hover text
+        saved_go.hoverlabel = {"namelength": -1}
         self.fig.data.append(saved_go)
 
     def add_ohlc(
@@ -253,6 +255,7 @@ class PlotlySubplot:
                 name=name,
                 xaxis=self.xaxis_id,
                 yaxis=self.yaxis_id,
+                hoverlabel={"namelength": -1},
             )
         )
 
@@ -434,6 +437,7 @@ class PlotlySubplot:
             name=name,
             yaxis=self.yaxis_id,
             xaxis=self.xaxis_id,
+            hoverlabel={"namelength": -1},
         )
         self.fig.data.append(gobj)
 
