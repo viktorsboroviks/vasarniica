@@ -82,6 +82,8 @@ class PlotlyFigure:
         x_share_with: "PlotlySubplot" = None,
         x_skip_no_data=False,
         rangeslider_visible=False,
+        x_title=None,
+        y_title=None,
     ) -> "PlotlySubplot":
         new_subplot = PlotlySubplot(
             self,
@@ -110,6 +112,11 @@ class PlotlyFigure:
         if x_skip_no_data:
             self.layout[new_subplot.xaxis_layout_id]["type"] = "category"
 
+        # title
+        self.layout[new_subplot.xaxis_layout_id]["title_text"] = x_title
+        self.layout[new_subplot.yaxis_layout_id]["title_text"] = y_title
+
+        # template
         if self.template == "simple_white":
             self.layout[new_subplot.xaxis_layout_id]["showgrid"] = False
             self.layout[new_subplot.xaxis_layout_id]["zeroline"] = False
