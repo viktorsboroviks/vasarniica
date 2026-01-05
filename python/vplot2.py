@@ -164,6 +164,9 @@ class PlotlyFigure:
             self.layout[new_subplot.yaxis_layout_id]["showspikes"] = False
             self.layout[new_subplot.yaxis_layout_id]["zeroline"] = False
 
+        if not x_visible and not y_visible:
+            new_subplot.add_dummy()
+
         return new_subplot
 
     def to_go(self) -> go.Figure:
@@ -241,6 +244,21 @@ class PlotlySubplot:
         # do not truncate long hover text
         saved_go.hoverlabel = {"namelength": -1}
         self.fig.data.append(saved_go)
+
+    def add_dummy(self):
+        if self.fig.dry_run:
+            return
+
+        self.add(
+            go.Scatter(
+                x=[0],
+                y=[0],
+                mode="markers",
+                marker_opacity=0,
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
 
     def add_ohlc(
         self,
@@ -374,6 +392,8 @@ class PlotlySubplot:
         text,
         font_color=Color.BLACK.value,
         font_size=10,
+        align="center",
+        xalign="center",
         ax=0,
         ay=0,
         ref_domain=False,
@@ -408,6 +428,8 @@ class PlotlySubplot:
                 ax=ax,
                 ay=ay,
                 text=text,
+                align=align,
+                xanchor=xalign,
                 showarrow=True,
                 arrowhead=arrow_head,
                 arrowsize=arrow_size,
