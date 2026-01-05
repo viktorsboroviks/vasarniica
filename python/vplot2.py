@@ -84,6 +84,8 @@ class PlotlyFigure:
         rangeslider_visible=False,
         x_title=None,
         y_title=None,
+        x_visible=True,
+        y_visible=True,
     ) -> "PlotlySubplot":
         new_subplot = PlotlySubplot(
             self,
@@ -152,6 +154,15 @@ class PlotlyFigure:
             "black", 0.15
         )
         self.layout[new_subplot.yaxis_layout_id]["spikethickness"] = -2
+
+        if not x_visible:
+            self.layout[new_subplot.xaxis_layout_id]["visible"] = False
+            self.layout[new_subplot.xaxis_layout_id]["showspikes"] = False
+            self.layout[new_subplot.xaxis_layout_id]["zeroline"] = False
+        if not y_visible:
+            self.layout[new_subplot.yaxis_layout_id]["visible"] = False
+            self.layout[new_subplot.yaxis_layout_id]["showspikes"] = False
+            self.layout[new_subplot.yaxis_layout_id]["zeroline"] = False
 
         return new_subplot
 
@@ -224,8 +235,9 @@ class PlotlySubplot:
 
         # copy object to avoid modifying original
         saved_go = copy.copy(go)
-        saved_go.xaxis = self.xaxis_id
-        saved_go.yaxis = self.yaxis_id
+        if hasattr(saved_go, "xaxis"):
+            saved_go.xaxis = self.xaxis_id
+            saved_go.yaxis = self.yaxis_id
         # do not truncate long hover text
         saved_go.hoverlabel = {"namelength": -1}
         self.fig.data.append(saved_go)
@@ -364,6 +376,7 @@ class PlotlySubplot:
         font_size=10,
         ax=0,
         ay=0,
+        ref_domain=False,
         show_arrow=False,
         arrow_size=1,
         arrow_head=1,
@@ -378,19 +391,27 @@ class PlotlySubplot:
         else:
             arrowcolor = Color.to_rgba_str(None, 0.0)
 
+        if ref_domain:
+            # this option requires at least one go.Object set in subplot
+            xref = f"{self.xaxis_id} domain"
+            yref = f"{self.yaxis_id} domain"
+        else:
+            xref = self.xaxis_id
+            yref = self.yaxis_id
+
         self.fig.layout["annotations"].append(
             dict(
                 x=x,
                 y=y,
-                xref=self.xaxis_id,
-                yref=self.yaxis_id,
+                xref=xref,
+                yref=yref,
+                ax=ax,
+                ay=ay,
                 text=text,
                 showarrow=True,
                 arrowhead=arrow_head,
                 arrowsize=arrow_size,
                 arrowcolor=arrowcolor,
-                ax=ax,
-                ay=ay,
                 font=dict(
                     color=font_color,
                     size=font_size,
