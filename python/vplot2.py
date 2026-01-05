@@ -100,11 +100,13 @@ class PlotlyFigure:
         self.layout[new_subplot.xaxis_layout_id] = {}
         self.layout[new_subplot.yaxis_layout_id] = {}
 
+        # domain
         if x_domain:
             self.layout[new_subplot.xaxis_layout_id]["domain"] = x_domain
         if y_domain:
             self.layout[new_subplot.yaxis_layout_id]["domain"] = y_domain
 
+        # x-axis
         assert not (x_skip_no_data and x_share_with)
         if not x_share_with:
             self.layout[new_subplot.xaxis_layout_id]["rangeslider"] = dict(
@@ -113,6 +115,10 @@ class PlotlyFigure:
             self.layout[new_subplot.xaxis_layout_id]["anchor"] = new_subplot.yaxis_id
         if x_skip_no_data:
             self.layout[new_subplot.xaxis_layout_id]["type"] = "category"
+
+        # y-axis
+        self.layout[new_subplot.yaxis_layout_id]["side"] = "left"
+        self.layout[new_subplot.yaxis_layout_id]["anchor"] = new_subplot.xaxis_id
 
         # title
         self.layout[new_subplot.xaxis_layout_id]["title_text"] = x_title
