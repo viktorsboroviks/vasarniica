@@ -86,6 +86,7 @@ class PlotlyFigure:
         y_title=None,
         x_visible=True,
         y_visible=True,
+        y_include_zero=False,
     ) -> "PlotlySubplot":
         new_subplot = PlotlySubplot(
             self,
@@ -119,6 +120,8 @@ class PlotlyFigure:
         # y-axis
         self.layout[new_subplot.yaxis_layout_id]["side"] = "left"
         self.layout[new_subplot.yaxis_layout_id]["anchor"] = new_subplot.xaxis_id
+        if y_include_zero:
+            self.layout[new_subplot.yaxis_layout_id]["rangemode"] = "tozero"
 
         # title
         self.layout[new_subplot.xaxis_layout_id]["title_text"] = x_title
