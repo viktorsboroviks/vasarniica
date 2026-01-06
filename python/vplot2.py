@@ -44,6 +44,7 @@ DEFAULT_LINE_WIDTH = 0.7
 class PlotlyFigure:
     def __init__(
         self,
+        title: str = None,
         font_size: int = 8,
         template: str = "simple_white",
         showlegend: bool = False,
@@ -62,6 +63,7 @@ class PlotlyFigure:
         self.layout["annotations"] = []
         self.layout["font"] = {}
         self.layout["font"]["size"] = font_size
+        self.layout["title"] = title
 
         self.template = template
         if template == "simple_white":
