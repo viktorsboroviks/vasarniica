@@ -82,3 +82,45 @@ def trailing_atr(
         res.iloc[i] = ta
         prev_ta = ta
     return res
+
+
+def sharpe_from_equity(equity_series: pd.Series, scaling_factor: float) -> float:
+    """
+    Calculate the Sharpe Ratio from an equity curve, scaled by a factor.
+
+    The calculation follows the standard formula:
+    Sharpe = (Mean Excess Return / Std Dev of Return) * sqrt(Scaling Factor)
+
+    Note: This implementation assumes a risk-free rate of 0.0.
+
+    Args:
+        equity_series: Time series of portfolio equity (cash + open positions).
+        scaling_factor: The factor used to scale the ratio.
+                        Should contain number of active periods per period
+                        (usually year), when market was open / strategy was running.
+
+    Returns:
+        The scaled Sharpe Ratio. Returns 0.0 if standard deviation is zero.
+
+    Ref:
+        For annualized value:
+        < 1.0       - poor
+        1.0 to 1.5  - acceptable
+        1.5 to 2.0  - good
+        > 2.0       - excellent
+    """
+    # make sure calculating on numeric type
+    # convert invalid values to NaN and drop them
+    equity = pd.to_numeric(equity_series, errors="coerce").dropna()
+    assert len(equity) > 2
+
+    returns = equity.pct_change().dropna()
+    assert len(returns) > 2
+
+    # set degrees of freedom to 1 for sample standard deviation
+    # not total population
+    sigma = float(returns.std(ddof=1))
+    if sigma == 0.0 or not np.isfinite(sigma):
+        return 0.0
+
+    return returns.mean() / sigma * np.sqrt(scaling_factor)
