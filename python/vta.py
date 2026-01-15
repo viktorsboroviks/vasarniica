@@ -84,26 +84,28 @@ def trailing_atr(
     return res
 
 
-def sharpe_from_equity(equity_series: pd.Series, scaling_factor: float) -> float:
+def sharpe(data_series: pd.Series, scaling_factor: float) -> float:
     """
-    Calculate the Sharpe Ratio from an equity curve, scaled by a factor.
+    Calculate the Sharpe ratio from the data series, scaled by a factor.
+
+    data_series usually represent portfolio equity (cash + open positions)
+    and the Sharpe ratio is used to evaluate risk-adjusted return of an
+    investing or trading strategy.
 
     The calculation follows the standard formula:
-    Sharpe = (Mean Excess Return / Std Dev of Return) * sqrt(Scaling Factor)
+    sharpe = (mean excess value / std dev of value) * sqrt(scaling factor)
 
-    Note: This implementation assumes a risk-free rate of 0.0.
+    Note:
+        This implementation assumes a risk-free rate of 0.0.
 
     Args:
-        equity_series: Time series of portfolio equity (cash + open positions).
+        data_series: Time series of data values (e.g., equity).
         scaling_factor: The factor used to scale the ratio.
                         Should contain number of active periods per period
                         (usually year), when market was open / strategy was running.
 
-    Returns:
-        The scaled Sharpe Ratio. Returns 0.0 if standard deviation is zero.
-
-    Ref:
-        For annualized value:
+    Refs:
+        For annualized sharpe on equity curve:
         < 1.0       - poor
         1.0 to 1.5  - acceptable
         1.5 to 2.0  - good
@@ -111,10 +113,10 @@ def sharpe_from_equity(equity_series: pd.Series, scaling_factor: float) -> float
     """
     # make sure calculating on numeric type
     # convert invalid values to NaN and drop them
-    equity = pd.to_numeric(equity_series, errors="coerce").dropna()
-    assert len(equity) > 2
+    data = pd.to_numeric(data_series, errors="coerce").dropna()
+    assert len(data) > 2
 
-    returns = equity.pct_change().dropna()
+    returns = data.pct_change().dropna()
     assert len(returns) > 2
 
     # set degrees of freedom to 1 for sample standard deviation
@@ -124,3 +126,31 @@ def sharpe_from_equity(equity_series: pd.Series, scaling_factor: float) -> float
         return 0.0
 
     return returns.mean() / sigma * np.sqrt(scaling_factor)
+
+
+def sqn(pnl_series: pd.DataFrame) -> float:
+    """
+    Calculate the System Quality Number (SQN) from a series of pnl values.
+
+    Used to evaluate the quality of a trading system.
+    Rewards consistently big returns over a large number of trades.
+
+    For fair comparison of 2 different systems, use same time period.
+
+    The calculation follows the standard formula:
+    SQN = (mean return / stdev of return) * sqrt(n),
+    where:
+        n is the number of returns.
+
+    Refs:
+        Systems Thinking in Trading by Van K. Tharp, Ph.D.
+        https://www.vantharp.com/system-quality-number-sqn/
+
+        For SQN values:
+        < 1.7       - poor, hard to trade
+        1.7 to 3    - average
+        3.0 to 5.0  - good
+        5.0 to 7.0  - excellent
+        > 7.0       - holy grail
+    """
+    return np.sqrt(len(pnl_series)) * (pnl_series.mean() / pnl_series.std(ddof=1))
