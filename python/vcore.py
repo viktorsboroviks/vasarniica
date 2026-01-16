@@ -1,5 +1,6 @@
 """Generic functions."""
 
+import copy
 import dataclasses
 import typing
 import networkx as nx
@@ -71,3 +72,58 @@ def merge_lists(lists: list[typing.Iterable]) -> typing.Iterable:
     if len(all_paths) > 0:
         res = res + all_paths[0]
     return res
+
+
+def copy_list(lst) -> list:
+    """
+    Copy a list of objects by creating shallow copies of each object.
+
+    Useful when the list contains mutable objects that should not be shared
+    and deepcopy is not necessary or excessive.
+    """
+    return [copy.copy(c) for c in lst]
+
+
+def it_flatten_dict(dct: dict) -> typing.Iterator[dict]:
+    """
+    Flatten a dictionary with list values into multiple dictionaries.
+
+    Useful for slicing one multidimensional set of parameters
+    into multiple sets of flat one-dimensional parameters.
+
+    Example:
+        initial_dict = {
+            "a": [1, 2],
+            "b": "x",
+            "c": [True, False],
+        }
+        for d in it_flatten_dict(initial_dict):
+            print(d)
+
+        # Output:
+        {'a': 1, 'b': 'x', 'c': True}
+        {'a': 1, 'b': 'x', 'c': False}
+        {'a': 2, 'b': 'x', 'c': True}
+        {'a': 2, 'b': 'x', 'c': False}
+    """
+    assert isinstance(dct, dict)
+    ret_dct = dct.copy()
+    result_yielded = False
+    for k, v in dct.items():
+        if isinstance(v, list):
+            assert len(v) > 0
+            # do not yield single-value lists as it would cause
+            # unnecessary recursion
+            if len(v) == 1:
+                ret_dct[k] = v[0]
+                continue
+
+            result_yielded = True
+            for list_v in v:
+                rec_ret_dct = ret_dct.copy()
+                rec_ret_dct[k] = list_v
+                yield from it_flatten_dict(rec_ret_dct)
+            return
+
+    if not result_yielded:
+        yield ret_dct
